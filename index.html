@@ -118,22 +118,20 @@
         }
     }
 
-    // 3. 核心批量处理逻辑
+   // 3. 核心批量处理逻辑 (加入双保险机制)
     processBtn.addEventListener('click', async () => {
         processBtn.disabled = true;
         outDirBtn.disabled = true;
-        await Tone.start(); // 激活音频上下文
+        await Tone.start(); 
         
         for (let i = 0; i < inputFiles.length; i++) {
             const file = inputFiles[i];
             logBox.innerText = `⏳ 正在处理 (${i+1}/${inputFiles.length}): ${file.name}`;
             
             try {
-                // 读取原始文件到 AudioBuffer
                 const arrayBuffer = await file.arrayBuffer();
                 const audioBuffer = await Tone.context.decodeAudioData(arrayBuffer);
                 
-                // 使用 OfflineAudioContext 后台极速渲染
                 const renderedBuffer = await Tone.Offline(({ context }) => {
                     const offPlayer = new Tone.Player(audioBuffer);
                     const offFilter = new Tone.Filter({ type: "highpass", frequency: params.cutoff });
@@ -144,49 +142,49 @@
                     offPlayer.start(0);
                 }, audioBuffer.duration);
 
-                // 将渲染后的 Buffer 转为 WAV Blob
                 const wavBlob = bufferToWave(renderedBuffer.get(), renderedBuffer.length);
-                
-                // 将文件直接写入用户刚才选择的输出文件夹
                 const newName = `Stereo_${file.name.replace(/\.[^/.]+$/, "")}.wav`;
-                const fileHandle = await outputDirHandle.getFileHandle(newName, { create: true });
-                const writable = await fileHandle.createWritable();
-                await writable.write(wavBlob);
-                await writable.close();
+
+                // --- 👇 这里是全新的双保险保存逻辑 👇 ---
+                let savedToDir = false;
+                
+                if (outputDirHandle) {
+                    try {
+                        // 尝试写入用户指定的文件夹
+                        const fileHandle = await outputDirHandle.getFileHandle(newName, { create: true });
+                        const writable = await fileHandle.createWritable();
+                        await writable.write(wavBlob);
+                        await writable.close();
+                        savedToDir = true;
+                    } catch (writeErr) {
+                        console.warn("直接写入文件夹失败，将使用传统下载:", writeErr);
+                    }
+                }
+
+                // 如果没选文件夹，或者写入失败，启用备用方案：触发普通浏览器下载
+                if (!savedToDir) {
+                    const url = URL.createObjectURL(wavBlob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = newName;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }
+                // --- 👆 双保险逻辑结束 👆 ---
 
             } catch (err) {
                 console.error(`处理 ${file.name} 时出错:`, err);
+                alert(`❌ 处理 ${file.name} 时发生错误，请按 F12 查看控制台。`);
             }
         }
 
-        logBox.innerText = "✅ 批量处理全部完成！文件已存入目标文件夹。";
+        logBox.innerText = "✅ 批量处理全部完成！如果未存入指定文件夹，请检查浏览器的'下载'目录。";
         processBtn.disabled = false;
         outDirBtn.disabled = false;
     });
-
-    // 辅助函数：AudioBuffer 转 WAV
-    function bufferToWave(abuffer, len) {
-        let numOfChan = abuffer.numberOfChannels, length = len * numOfChan * 2 + 44;
-        let buffer = new ArrayBuffer(length), view = new DataView(buffer), channels = [], i, sample, offset = 0, pos = 0;
-        const setUint16 = (data) => { view.setUint16(offset, data, true); offset += 2; };
-        const setUint32 = (data) => { view.setUint32(offset, data, true); offset += 4; };
-
-        setUint32(0x46464952); setUint32(length - 8); setUint32(0x45564157); setUint32(0x20746d66);
-        setUint32(16); setUint16(1); setUint16(numOfChan); setUint32(abuffer.sampleRate);
-        setUint32(abuffer.sampleRate * 2 * numOfChan); setUint16(numOfChan * 2); setUint16(16);
-        setUint32(0x61746164); setUint32(length - pos - 4);
-
-        for (i = 0; i < numOfChan; i++) channels.push(abuffer.getChannelData(i));
-        while (pos < len) {
-            for (i = 0; i < numOfChan; i++) {
-                sample = Math.max(-1, Math.min(1, channels[i][pos]));
-                sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
-                view.setInt16(offset, sample, true); offset += 2;
-            }
-            pos++;
-        }
-        return new Blob([buffer], { type: "audio/wav" });
-    }
 </script>
 </body>
 </html>
