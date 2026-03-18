@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>立体声批量生成器 Web 版本</title>
+    <title>立体声批量生成器 Web Pro</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <style>
         body { font-family: 'Microsoft YaHei', sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; padding-top: 50px; }
@@ -74,7 +74,6 @@
     const processBtn = document.getElementById('processBtn');
     const logBox = document.getElementById('logBox');
 
-    // 参数绑定逻辑
     const params = { cutoff: 150, chorus: 0.3, room: 0.85, wet: 0.15 };
     const bindSlider = (id, paramKey) => {
         const slider = document.getElementById(id);
@@ -87,9 +86,7 @@
     bindSlider('cutoff', 'cutoff'); bindSlider('chorus', 'chorus');
     bindSlider('room', 'room'); bindSlider('wet', 'wet');
 
-    // 1. 读取输入文件夹
     dirUpload.addEventListener('change', (e) => {
-        // 过滤出音频文件
         inputFiles = Array.from(e.target.files).filter(f => f.type.startsWith('audio/') || f.name.match(/\.(wav|mp3|flac|m4a)$/i));
         if (inputFiles.length > 0) {
             document.getElementById('inStatus').innerText = `已加载 ${inputFiles.length} 个音频文件`;
@@ -99,10 +96,8 @@
         }
     });
 
-    // 2. 选择输出文件夹 (使用现代 File System Access API)
     outDirBtn.addEventListener('click', async () => {
         try {
-            // 呼出浏览器的文件夹选择器，并请求写入权限
             outputDirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
             document.getElementById('outStatus').innerText = `已授权保存至: ${outputDirHandle.name}`;
             checkReady();
@@ -112,13 +107,12 @@
     });
 
     function checkReady() {
-        if (inputFiles.length > 0 && outputDirHandle) {
+        if (inputFiles.length > 0) {
             processBtn.disabled = false;
             logBox.innerText = "就绪：可以开始批量处理！";
         }
     }
 
-   // 3. 核心批量处理逻辑 (加入双保险机制)
     processBtn.addEventListener('click', async () => {
         processBtn.disabled = true;
         outDirBtn.disabled = true;
@@ -132,42 +126,34 @@
                 const arrayBuffer = await file.arrayBuffer();
                 const audioBuffer = await Tone.context.decodeAudioData(arrayBuffer);
                 
-                // 使用 OfflineAudioContext 后台极速渲染
-                const renderedBuffer = await Tone.Offline((context) => {  // 注意这里：只有 context，没有大括号
+                // 完美的后台离线渲染写法
+                const renderedBuffer = await Tone.Offline(() => {
                     const offPlayer = new Tone.Player(audioBuffer);
                     const offFilter = new Tone.Filter({ type: "highpass", frequency: params.cutoff });
                     const offChorus = new Tone.Chorus({ rate: 0.5, delayTime: 8, depth: 0.15, feedback: 0, wet: params.chorus }).start();
                     const offReverb = new Tone.Freeverb({ roomSize: params.room, dampening: 3000, wet: params.wet });
                     
-                    // 1. 先把播放器和所有效果器串联起来
-                    offPlayer.chain(offFilter, offChorus, offReverb);
-                    
-                    // 2. 将最后一个效果器(混响)专门插到“离线输出接口”上
-                    offReverb.connect(context.destination);
-                    
+                    // 魔术方法 toDestination()：完美适配后台虚拟出口，不报错！
+                    offPlayer.chain(offFilter, offChorus, offReverb).toDestination();
                     offPlayer.start(0);
                 }, audioBuffer.duration);
-                
+
                 const wavBlob = bufferToWave(renderedBuffer.get(), renderedBuffer.length);
                 const newName = `Stereo_${file.name.replace(/\.[^/.]+$/, "")}.wav`;
 
-                // --- 👇 这里是全新的双保险保存逻辑 👇 ---
                 let savedToDir = false;
-                
                 if (outputDirHandle) {
                     try {
-                        // 尝试写入用户指定的文件夹
                         const fileHandle = await outputDirHandle.getFileHandle(newName, { create: true });
                         const writable = await fileHandle.createWritable();
                         await writable.write(wavBlob);
                         await writable.close();
                         savedToDir = true;
                     } catch (writeErr) {
-                        console.warn("直接写入文件夹失败，将使用传统下载:", writeErr);
+                        console.warn("直接写入文件夹失败:", writeErr);
                     }
                 }
 
-                // 如果没选文件夹，或者写入失败，启用备用方案：触发普通浏览器下载
                 if (!savedToDir) {
                     const url = URL.createObjectURL(wavBlob);
                     const a = document.createElement('a');
@@ -179,11 +165,9 @@
                     document.body.removeChild(a);
                     URL.revokeObjectURL(url);
                 }
-                // --- 👆 双保险逻辑结束 👆 ---
 
             } catch (err) {
                 console.error(`处理 ${file.name} 时出错:`, err);
-                alert(`❌ 处理 ${file.name} 时发生错误，请按 F12 查看控制台。`);
             }
         }
 
@@ -191,6 +175,30 @@
         processBtn.disabled = false;
         outDirBtn.disabled = false;
     });
+
+    // AudioBuffer 转 WAV 算法
+    function bufferToWave(abuffer, len) {
+        let numOfChan = abuffer.numberOfChannels, length = len * numOfChan * 2 + 44;
+        let buffer = new ArrayBuffer(length), view = new DataView(buffer), channels = [], i, sample, offset = 0, pos = 0;
+        const setUint16 = (data) => { view.setUint16(offset, data, true); offset += 2; };
+        const setUint32 = (data) => { view.setUint32(offset, data, true); offset += 4; };
+
+        setUint32(0x46464952); setUint32(length - 8); setUint32(0x45564157); setUint32(0x20746d66);
+        setUint32(16); setUint16(1); setUint16(numOfChan); setUint32(abuffer.sampleRate);
+        setUint32(abuffer.sampleRate * 2 * numOfChan); setUint16(numOfChan * 2); setUint16(16);
+        setUint32(0x61746164); setUint32(length - pos - 4);
+
+        for (i = 0; i < numOfChan; i++) channels.push(abuffer.getChannelData(i));
+        while (pos < len) {
+            for (i = 0; i < numOfChan; i++) {
+                sample = Math.max(-1, Math.min(1, channels[i][pos]));
+                sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
+                view.setInt16(offset, sample, true); offset += 2;
+            }
+            pos++;
+        }
+        return new Blob([buffer], { type: "audio/wav" });
+    }
 </script>
 </body>
 </html>
