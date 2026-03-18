@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>立体声空间生成器 Web 终极修复版</title>
+    <title>立体声空间生成器 Web 终极无损版</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <style>
         body { font-family: 'Microsoft YaHei', sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; padding: 40px 0;}
@@ -99,7 +99,7 @@
     let outputDirHandle = null;
     let isPlaying = false;
 
-    // --- 核心：建立【实时预览】的音频链 ---
+    // --- 实时预览的音频链 ---
     const liveFilter = new Tone.Filter({ type: "highpass", frequency: 150 });
     const liveChorus = new Tone.Chorus({ rate: 0.5, delayTime: 8, depth: 0.15, feedback: 0, wet: 0.3 }).start();
     const liveReverb = new Tone.Freeverb({ roomSize: 0.85, dampening: 3000, wet: 0.15 });
@@ -198,12 +198,15 @@
         }
     });
 
-    // --- 【深度修复】批量离线渲染逻辑 ---
+    // --- 【深度核心修复】离线渲染 ---
     processBtn.addEventListener('click', async () => {
         if (livePlayer.state === "started") { livePlayer.stop(); isPlaying = false; playBtn.innerText = "▶️ 播放 / 暂停"; }
         
         processBtn.disabled = true;
         await Tone.start(); 
+        
+        // 创建原生上下文解码，保证最纯净的音频数据
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
         for (let i = 0; i < inputFiles.length; i++) {
             const file = inputFiles[i];
@@ -211,25 +214,34 @@
             await new Promise(resolve => setTimeout(resolve, 150)); 
             
             try {
-                // 修复1：使用 ToneAudioBuffer 引擎来加载，保证和实时预览一样的双声道解码，防止原生降级。
-                const url = URL.createObjectURL(file);
-                const toneBuffer = new Tone.ToneAudioBuffer();
-                await toneBuffer.load(url);
-                URL.revokeObjectURL(url); // 释放内存
+                const arrayBuffer = await file.arrayBuffer();
+                const nativeAudioBuffer = await audioContext.decodeAudioData(arrayBuffer);
                 
-                // 修复2：强制声明渲染使用 2 个通道 (参数 '2')，杜绝单声道模式
-                const renderedBuffer = await Tone.Offline(() => {
-                    const offPlayer = new Tone.Player(toneBuffer);
+                // 修复2：为混响和延迟加上 2.5 秒的“长尾”，防止戛然而止
+                const renderDuration = nativeAudioBuffer.duration + 2.5;
+                
+                // 将原生的 Buffer 喂给 Tone.js
+                const toneAudioBuffer = new Tone.ToneAudioBuffer(nativeAudioBuffer);
+
+                // 修复3：严格锁死渲染采样率与原文件完全一致
+                const renderedBuffer = await Tone.Offline(({ transport }) => {
+                    const offPlayer = new Tone.Player(toneAudioBuffer);
                     const offFilter = new Tone.Filter({ type: "highpass", frequency: params.cutoff });
-                    const offChorus = new Tone.Chorus({ rate: 0.5, delayTime: 8, depth: 0.15, feedback: 0, wet: params.chorus }).start();
+                    
+                    // 确保效果器的参数与预览 100% 同步
+                    const offChorus = new Tone.Chorus({ rate: 0.5, delayTime: 8, depth: 0.15, feedback: 0, wet: params.chorus }).start(0);
                     const offReverb = new Tone.Freeverb({ roomSize: params.room, dampening: 3000, wet: params.wet });
                     const offWidener = new Tone.StereoWidener(params.width);
                     
                     offPlayer.chain(offFilter, offChorus, offReverb, offWidener).toDestination();
+                    
                     offPlayer.start(0);
-                }, toneBuffer.duration, 2); 
+                    
+                    // 修复1：极其致命的破案点！离线模式必须【手动强制启动交通引擎】，否则合唱效果直接卡死为单声道！
+                    transport.start(0);
 
-                // 转换音频
+                }, renderDuration, 2, nativeAudioBuffer.sampleRate); 
+
                 const wavBlob = bufferToWave(renderedBuffer.get(), renderedBuffer.length);
                 const newName = `Stereo_${file.name.replace(/\.[^/.]+$/, "")}.wav`;
 
@@ -258,32 +270,21 @@
             } catch (err) { console.error(`处理出错:`, err); }
         }
 
-        logBox.innerText = "🎉 批量处理全部完成！";
+        logBox.innerText = "🎉 批量处理全部完成！快去听听绝赞的立体声吧！";
         processBtn.disabled = false;
     });
 
-    // --- 【深度修复】AudioBuffer 转 WAV ---
+    // --- 标准 WAV 打包算法 ---
     function bufferToWave(abuffer, len) {
         let numOfChan = abuffer.numberOfChannels, length = len * numOfChan * 2 + 44;
         let buffer = new ArrayBuffer(length), view = new DataView(buffer), channels = [], i, sample, offset = 0, pos = 0;
         const setUint16 = (data) => { view.setUint16(offset, data, true); offset += 2; };
         const setUint32 = (data) => { view.setUint32(offset, data, true); offset += 4; };
 
-        setUint32(0x46464952); // "RIFF"
-        setUint32(length - 8); 
-        setUint32(0x45564157); // "WAVE"
-        setUint32(0x20746d66); // "fmt "
-        setUint32(16); 
-        setUint16(1); 
-        setUint16(numOfChan); 
-        setUint32(abuffer.sampleRate);
-        setUint32(abuffer.sampleRate * 2 * numOfChan); 
-        setUint16(numOfChan * 2); 
-        setUint16(16); 
-        setUint32(0x61746164); // "data"
-        
-        // 修复3：严格修正了区块长度算法（以前这里是 length - 4，会引发严重的播放器格式误判）
-        setUint32(length - 44); 
+        setUint32(0x46464952); setUint32(length - 8); setUint32(0x45564157); setUint32(0x20746d66);
+        setUint32(16); setUint16(1); setUint16(numOfChan); setUint32(abuffer.sampleRate);
+        setUint32(abuffer.sampleRate * 2 * numOfChan); setUint16(numOfChan * 2); setUint16(16);
+        setUint32(0x61746164); setUint32(length - 44);
 
         for (i = 0; i < numOfChan; i++) channels.push(abuffer.getChannelData(i));
         while (pos < len) {
