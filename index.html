@@ -132,14 +132,15 @@
                 const arrayBuffer = await file.arrayBuffer();
                 const audioBuffer = await Tone.context.decodeAudioData(arrayBuffer);
                 
-                const renderedBuffer = await Tone.Offline(({ context }) => {
-                    const offPlayer = new Tone.Player(audioBuffer);
-                    const offFilter = new Tone.Filter({ type: "highpass", frequency: params.cutoff });
-                    const offChorus = new Tone.Chorus({ rate: 0.5, delayTime: 8, depth: 0.15, feedback: 0, wet: params.chorus }).start();
-                    const offReverb = new Tone.Freeverb({ roomSize: params.room, dampening: 3000, wet: params.wet });
-                    
-                    offPlayer.chain(offFilter, offChorus, offReverb, context.destination);
-                    offPlayer.start(0);
+                const renderedBuffer = await Tone.Offline(() => {  // 1. 去掉了 ({ context })
+                      const offPlayer = new Tone.Player(audioBuffer);
+                      const offFilter = new Tone.Filter({ type: "highpass", frequency: params.cutoff });
+                      const offChorus = new Tone.Chorus({ rate: 0.5, delayTime: 8, depth: 0.15, feedback: 0, wet: params.chorus }).start();
+                      const offReverb = new Tone.Freeverb({ roomSize: params.room, dampening: 3000, wet: params.wet });
+    
+                // 2. 将 context.destination 改为 Tone.Destination
+                offPlayer.chain(offFilter, offChorus, offReverb, Tone.Destination); 
+                offPlayer.start(0);
                 }, audioBuffer.duration);
 
                 const wavBlob = bufferToWave(renderedBuffer.get(), renderedBuffer.length);
