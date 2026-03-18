@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>立体声空间生成器 Web 终极无损版</title>
+    <title>立体声空间生成器 Web 涅槃重生版</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <style>
         body { font-family: 'Microsoft YaHei', sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; padding: 40px 0;}
@@ -99,11 +99,12 @@
     let outputDirHandle = null;
     let isPlaying = false;
 
-    // --- 实时预览的音频链 ---
+    // --- 实时预览的正确链式调用 ---
     const liveFilter = new Tone.Filter({ type: "highpass", frequency: 150 });
     const liveChorus = new Tone.Chorus({ rate: 0.5, delayTime: 8, depth: 0.15, feedback: 0, wet: 0.3 }).start();
     const liveReverb = new Tone.Freeverb({ roomSize: 0.85, dampening: 3000, wet: 0.15 });
     const liveWidener = new Tone.StereoWidener(0.8);
+    // 这里就是预览不出错的秘诀：Tone.Destination 被包在了 chain 里面！
     const livePlayer = new Tone.Player().chain(liveFilter, liveChorus, liveReverb, liveWidener, Tone.Destination);
 
     const fileUpload = document.getElementById('fileUpload');
@@ -114,7 +115,7 @@
     const processBtn = document.getElementById('processBtn');
     const logBox = document.getElementById('logBox');
 
-    const params = { width: 0.8, cutoff: 150, chorus: 0.3, room: 0.85, wet: 0.15 };
+    const params = { width: 0.10, cutoff: 150, chorus: 0.3, room: 0.85, wet: 0.15 };
     
     const bindSlider = (id, paramKey) => {
         const slider = document.getElementById(id);
@@ -198,15 +199,12 @@
         }
     });
 
-    // --- 【深度核心修复】离线渲染 ---
+    // --- 【终极修复】离线渲染完美版 ---
     processBtn.addEventListener('click', async () => {
         if (livePlayer.state === "started") { livePlayer.stop(); isPlaying = false; playBtn.innerText = "▶️ 播放 / 暂停"; }
         
         processBtn.disabled = true;
         await Tone.start(); 
-        
-        // 创建原生上下文解码，保证最纯净的音频数据
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
         for (let i = 0; i < inputFiles.length; i++) {
             const file = inputFiles[i];
@@ -214,33 +212,32 @@
             await new Promise(resolve => setTimeout(resolve, 150)); 
             
             try {
-                const arrayBuffer = await file.arrayBuffer();
-                const nativeAudioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                // 修复1：使用 ToneAudioBuffer 引擎来加载，完美避免原生解码的潜在问题
+                const url = URL.createObjectURL(file);
+                const toneBuffer = new Tone.ToneAudioBuffer();
+                await toneBuffer.load(url);
+                URL.revokeObjectURL(url); // 释放内存
                 
-                // 修复2：为混响和延迟加上 2.5 秒的“长尾”，防止戛然而止
-                const renderDuration = nativeAudioBuffer.duration + 2.5;
-                
-                // 将原生的 Buffer 喂给 Tone.js
-                const toneAudioBuffer = new Tone.ToneAudioBuffer(nativeAudioBuffer);
+                // 保留混响尾音空间
+                const renderDuration = toneBuffer.duration + 2.5;
 
-                // 修复3：严格锁死渲染采样率与原文件完全一致
+                // 修复2：Tone.Offline 默认就是双声道，不需要传第三个参数
                 const renderedBuffer = await Tone.Offline(({ transport }) => {
-                    const offPlayer = new Tone.Player(toneAudioBuffer);
+                    // 修复3：使用 toneBuffer.get() 提取原生 Buffer，完美跨越 Offline 上下文
+                    const offPlayer = new Tone.Player(toneBuffer.get());
                     const offFilter = new Tone.Filter({ type: "highpass", frequency: params.cutoff });
-                    
-                    // 确保效果器的参数与预览 100% 同步
-                    const offChorus = new Tone.Chorus({ rate: 0.5, delayTime: 8, depth: 0.15, feedback: 0, wet: params.chorus }).start(0);
+                    const offChorus = new Tone.Chorus({ rate: 0.5, delayTime: 8, depth: 0.15, feedback: 0, wet: params.chorus }).start();
                     const offReverb = new Tone.Freeverb({ roomSize: params.room, dampening: 3000, wet: params.wet });
                     const offWidener = new Tone.StereoWidener(params.width);
                     
-                    offPlayer.chain(offFilter, offChorus, offReverb, offWidener).toDestination();
+                    // 修复4（最致命的断头路Bug）：将 Tone.Destination 作为 chain 的最后一环！
+                    offPlayer.chain(offFilter, offChorus, offReverb, offWidener, Tone.Destination);
                     
                     offPlayer.start(0);
-                    
-                    // 修复1：极其致命的破案点！离线模式必须【手动强制启动交通引擎】，否则合唱效果直接卡死为单声道！
+                    // 保险：启动离线环境下的时间引擎，确保 Chorus LFO 正常游走
                     transport.start(0);
 
-                }, renderDuration, 2, nativeAudioBuffer.sampleRate); 
+                }, renderDuration); 
 
                 const wavBlob = bufferToWave(renderedBuffer.get(), renderedBuffer.length);
                 const newName = `Stereo_${file.name.replace(/\.[^/.]+$/, "")}.wav`;
@@ -270,7 +267,7 @@
             } catch (err) { console.error(`处理出错:`, err); }
         }
 
-        logBox.innerText = "🎉 批量处理全部完成！快去听听绝赞的立体声吧！";
+        logBox.innerText = "🎉 批量处理全部完成！去听听真正的立体声吧！";
         processBtn.disabled = false;
     });
 
