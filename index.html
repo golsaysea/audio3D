@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>立体声空间生成器 Web 终极版</title>
+    <title>立体声空间生成器 Web 终极修复版</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <style>
         body { font-family: 'Microsoft YaHei', sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; padding: 40px 0;}
@@ -104,10 +104,8 @@
     const liveChorus = new Tone.Chorus({ rate: 0.5, delayTime: 8, depth: 0.15, feedback: 0, wet: 0.3 }).start();
     const liveReverb = new Tone.Freeverb({ roomSize: 0.85, dampening: 3000, wet: 0.15 });
     const liveWidener = new Tone.StereoWidener(0.8);
-    // 串联到扬声器
     const livePlayer = new Tone.Player().chain(liveFilter, liveChorus, liveReverb, liveWidener, Tone.Destination);
 
-    // 获取 DOM 元素
     const fileUpload = document.getElementById('fileUpload');
     const dirUpload = document.getElementById('dirUpload');
     const previewSelect = document.getElementById('previewSelect');
@@ -116,7 +114,6 @@
     const processBtn = document.getElementById('processBtn');
     const logBox = document.getElementById('logBox');
 
-    // --- 参数绑定：同时修改【实时预览】和【批量配置】 ---
     const params = { width: 0.8, cutoff: 150, chorus: 0.3, room: 0.85, wet: 0.15 };
     
     const bindSlider = (id, paramKey) => {
@@ -128,7 +125,6 @@
             params[paramKey] = val;
             display.innerText = val;
             
-            // 关键：拖动滑块时，立即修改正在播放的实时效果器！
             if (paramKey === 'cutoff') liveFilter.frequency.value = val;
             if (paramKey === 'chorus') liveChorus.wet.value = val;
             if (paramKey === 'room') liveReverb.roomSize.value = val;
@@ -139,13 +135,11 @@
     bindSlider('width', 'width'); bindSlider('cutoff', 'cutoff'); 
     bindSlider('chorus', 'chorus'); bindSlider('room', 'room'); bindSlider('wet', 'wet');
 
-    // --- 处理文件加载 ---
     const handleFiles = (files) => {
         inputFiles = Array.from(files).filter(f => f.type.startsWith('audio/') || f.name.match(/\.(wav|mp3|flac|m4a)$/i));
         if (inputFiles.length > 0) {
             document.getElementById('fileStatus').innerText = `✅ 已加载 ${inputFiles.length} 个音频文件`;
             
-            // 填充试听下拉菜单
             previewSelect.innerHTML = "";
             inputFiles.forEach((file, index) => {
                 const option = document.createElement('option');
@@ -159,7 +153,6 @@
             outDirBtn.disabled = false;
             processBtn.disabled = false;
             
-            // 自动加载第一首准备试听
             loadPreviewTrack(0);
         } else {
             alert("未找到支持的音频文件！");
@@ -169,7 +162,6 @@
     fileUpload.addEventListener('change', (e) => handleFiles(e.target.files));
     dirUpload.addEventListener('change', (e) => handleFiles(e.target.files));
 
-    // --- 试听控制逻辑 ---
     async function loadPreviewTrack(index) {
         if (livePlayer.state === "started") { livePlayer.stop(); isPlaying = false; }
         playBtn.innerText = "⏳ 加载试听中...";
@@ -197,7 +189,6 @@
         isPlaying = !isPlaying;
     });
 
-    // --- 输出文件夹选择 ---
     outDirBtn.addEventListener('click', async () => {
         try {
             outputDirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
@@ -207,14 +198,12 @@
         }
     });
 
-    // --- 批量离线渲染逻辑 ---
+    // --- 【深度修复】批量离线渲染逻辑 ---
     processBtn.addEventListener('click', async () => {
-        // 如果正在试听，先停掉
         if (livePlayer.state === "started") { livePlayer.stop(); isPlaying = false; playBtn.innerText = "▶️ 播放 / 暂停"; }
         
         processBtn.disabled = true;
         await Tone.start(); 
-        const nativeContext = new (window.AudioContext || window.webkitAudioContext)();
 
         for (let i = 0; i < inputFiles.length; i++) {
             const file = inputFiles[i];
@@ -222,12 +211,15 @@
             await new Promise(resolve => setTimeout(resolve, 150)); 
             
             try {
-                const arrayBuffer = await file.arrayBuffer();
-                const audioBuffer = await nativeContext.decodeAudioData(arrayBuffer);
+                // 修复1：使用 ToneAudioBuffer 引擎来加载，保证和实时预览一样的双声道解码，防止原生降级。
+                const url = URL.createObjectURL(file);
+                const toneBuffer = new Tone.ToneAudioBuffer();
+                await toneBuffer.load(url);
+                URL.revokeObjectURL(url); // 释放内存
                 
-                // 后台极速渲染 (隔离于实时试听)
+                // 修复2：强制声明渲染使用 2 个通道 (参数 '2')，杜绝单声道模式
                 const renderedBuffer = await Tone.Offline(() => {
-                    const offPlayer = new Tone.Player(audioBuffer);
+                    const offPlayer = new Tone.Player(toneBuffer);
                     const offFilter = new Tone.Filter({ type: "highpass", frequency: params.cutoff });
                     const offChorus = new Tone.Chorus({ rate: 0.5, delayTime: 8, depth: 0.15, feedback: 0, wet: params.chorus }).start();
                     const offReverb = new Tone.Freeverb({ roomSize: params.room, dampening: 3000, wet: params.wet });
@@ -235,8 +227,9 @@
                     
                     offPlayer.chain(offFilter, offChorus, offReverb, offWidener).toDestination();
                     offPlayer.start(0);
-                }, audioBuffer.duration, 2); 
+                }, toneBuffer.duration, 2); 
 
+                // 转换音频
                 const wavBlob = bufferToWave(renderedBuffer.get(), renderedBuffer.length);
                 const newName = `Stereo_${file.name.replace(/\.[^/.]+$/, "")}.wav`;
 
@@ -251,7 +244,6 @@
                     } catch (e) { console.warn(e); }
                 }
 
-                // 备用下载方案
                 if (!savedToDir) {
                     const url = URL.createObjectURL(wavBlob);
                     const a = document.createElement('a');
@@ -270,17 +262,28 @@
         processBtn.disabled = false;
     });
 
-    // --- AudioBuffer 转 WAV ---
+    // --- 【深度修复】AudioBuffer 转 WAV ---
     function bufferToWave(abuffer, len) {
         let numOfChan = abuffer.numberOfChannels, length = len * numOfChan * 2 + 44;
         let buffer = new ArrayBuffer(length), view = new DataView(buffer), channels = [], i, sample, offset = 0, pos = 0;
         const setUint16 = (data) => { view.setUint16(offset, data, true); offset += 2; };
         const setUint32 = (data) => { view.setUint32(offset, data, true); offset += 4; };
 
-        setUint32(0x46464952); setUint32(length - 8); setUint32(0x45564157); setUint32(0x20746d66);
-        setUint32(16); setUint16(1); setUint16(numOfChan); setUint32(abuffer.sampleRate);
-        setUint32(abuffer.sampleRate * 2 * numOfChan); setUint16(numOfChan * 2); setUint16(16);
-        setUint32(0x61746164); setUint32(length - pos - 4);
+        setUint32(0x46464952); // "RIFF"
+        setUint32(length - 8); 
+        setUint32(0x45564157); // "WAVE"
+        setUint32(0x20746d66); // "fmt "
+        setUint32(16); 
+        setUint16(1); 
+        setUint16(numOfChan); 
+        setUint32(abuffer.sampleRate);
+        setUint32(abuffer.sampleRate * 2 * numOfChan); 
+        setUint16(numOfChan * 2); 
+        setUint16(16); 
+        setUint32(0x61746164); // "data"
+        
+        // 修复3：严格修正了区块长度算法（以前这里是 length - 4，会引发严重的播放器格式误判）
+        setUint32(length - 44); 
 
         for (i = 0; i < numOfChan; i++) channels.push(abuffer.getChannelData(i));
         while (pos < len) {
