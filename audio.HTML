@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>立体声批量生成器 Web Pro</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        body { font-family: 'Microsoft YaHei', sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; padding-top: 50px; }
+        .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 550px; }
+        h2 { margin-top: 0; color: #333; text-align: center; }
+        .control-group { margin-bottom: 20px; padding: 15px; border: 1px solid #e0e0e0; border-radius: 8px; }
+        .slider-row { display: flex; align-items: center; margin-bottom: 15px; }
+        .slider-row:last-child { margin-bottom: 0; }
+        label { width: 180px; font-size: 14px; color: #555; }
+        input[type="range"] { flex-grow: 1; margin: 0 10px; }
+        .value-display { width: 40px; text-align: right; font-size: 14px; font-weight: bold; color: #2196F3; }
+        .btn { display: block; width: 100%; padding: 12px; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; transition: background 0.3s; margin-top: 10px; font-weight: bold;}
+        .btn-input { background: #FF9800; } .btn-input:hover { background: #F57C00; }
+        .btn-output { background: #9C27B0; } .btn-output:hover { background: #7B1FA2; }
+        .btn-process { background: #4CAF50; margin-top: 20px; height: 50px; font-size: 18px;} .btn-process:hover { background: #45a049; }
+        .btn:disabled { background: #ccc; cursor: not-allowed; }
+        .status-box { margin-top: 15px; padding: 10px; background: #e3f2fd; border-radius: 6px; font-size: 14px; color: #1565c0; text-align: center; }
+        .path-text { font-size: 12px; color: #666; margin-top: 5px; word-break: break-all; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🎧 批量立体声生成器 Web 版</h2>
+    
+    <div class="control-group">
+        <button class="btn btn-input" onclick="document.getElementById('dirUpload').click()">📁 1. 选择输入文件夹 (包含音频)</button>
+        <input type="file" id="dirUpload" webkitdirectory multiple accept="audio/*" style="display: none;">
+        <div id="inStatus" class="path-text">未选择输入文件夹</div>
+
+        <button id="outDirBtn" class="btn btn-output">📂 2. 选择输出文件夹 (保存位置)</button>
+        <div id="outStatus" class="path-text">未选择输出文件夹</div>
+    </div>
+
+    <div class="control-group">
+        <div class="slider-row">
+            <label>高通滤波 (低音切除):</label>
+            <input type="range" id="cutoff" min="20" max="1000" step="1" value="150">
+            <span class="value-display" id="cutoff-val">150</span>
+        </div>
+        <div class="slider-row">
+            <label>合唱强度 (空间感):</label>
+            <input type="range" id="chorus" min="0" max="1" step="0.05" value="0.3">
+            <span class="value-display" id="chorus-val">0.3</span>
+        </div>
+        <div class="slider-row">
+            <label>混响房间大小:</label>
+            <input type="range" id="room" min="0" max="1" step="0.05" value="0.85">
+            <span class="value-display" id="room-val">0.85</span>
+        </div>
+        <div class="slider-row">
+            <label>混响湿声 (Wet):</label>
+            <input type="range" id="wet" min="0" max="1" step="0.05" value="0.15">
+            <span class="value-display" id="wet-val">0.15</span>
+        </div>
+    </div>
+
+    <button id="processBtn" class="btn btn-process" disabled>🚀 开始批量处理</button>
+    <div id="logBox" class="status-box">准备就绪，请选择输入和输出文件夹。</div>
+</div>
+
+<script>
+    let inputFiles = [];
+    let outputDirHandle = null;
+
+    const dirUpload = document.getElementById('dirUpload');
+    const outDirBtn = document.getElementById('outDirBtn');
+    const processBtn = document.getElementById('processBtn');
+    const logBox = document.getElementById('logBox');
+
+    // 参数绑定逻辑
+    const params = { cutoff: 150, chorus: 0.3, room: 0.85, wet: 0.15 };
+    const bindSlider = (id, paramKey) => {
+        const slider = document.getElementById(id);
+        const display = document.getElementById(`${id}-val`);
+        slider.addEventListener('input', (e) => {
+            params[paramKey] = parseFloat(e.target.value);
+            display.innerText = params[paramKey];
+        });
+    };
+    bindSlider('cutoff', 'cutoff'); bindSlider('chorus', 'chorus');
+    bindSlider('room', 'room'); bindSlider('wet', 'wet');
+
+    // 1. 读取输入文件夹
+    dirUpload.addEventListener('change', (e) => {
+        // 过滤出音频文件
+        inputFiles = Array.from(e.target.files).filter(f => f.type.startsWith('audio/') || f.name.match(/\.(wav|mp3|flac|m4a)$/i));
+        if (inputFiles.length > 0) {
+            document.getElementById('inStatus').innerText = `已加载 ${inputFiles.length} 个音频文件`;
+            checkReady();
+        } else {
+            alert("选中的文件夹中没有找到支持的音频文件！");
+        }
+    });
+
+    // 2. 选择输出文件夹 (使用现代 File System Access API)
+    outDirBtn.addEventListener('click', async () => {
+        try {
+            // 呼出浏览器的文件夹选择器，并请求写入权限
+            outputDirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+            document.getElementById('outStatus').innerText = `已授权保存至: ${outputDirHandle.name}`;
+            checkReady();
+        } catch (err) {
+            console.log("用户取消或不支持:", err);
+        }
+    });
+
+    function checkReady() {
+        if (inputFiles.length > 0 && outputDirHandle) {
+            processBtn.disabled = false;
+            logBox.innerText = "就绪：可以开始批量处理！";
+        }
+    }
+
+    // 3. 核心批量处理逻辑
+    processBtn.addEventListener('click', async () => {
+        processBtn.disabled = true;
+        outDirBtn.disabled = true;
+        await Tone.start(); // 激活音频上下文
+        
+        for (let i = 0; i < inputFiles.length; i++) {
+            const file = inputFiles[i];
+            logBox.innerText = `⏳ 正在处理 (${i+1}/${inputFiles.length}): ${file.name}`;
+            
+            try {
+                // 读取原始文件到 AudioBuffer
+                const arrayBuffer = await file.arrayBuffer();
+                const audioBuffer = await Tone.context.decodeAudioData(arrayBuffer);
+                
+                // 使用 OfflineAudioContext 后台极速渲染
+                const renderedBuffer = await Tone.Offline(({ context }) => {
+                    const offPlayer = new Tone.Player(audioBuffer);
+                    const offFilter = new Tone.Filter({ type: "highpass", frequency: params.cutoff });
+                    const offChorus = new Tone.Chorus({ rate: 0.5, delayTime: 8, depth: 0.15, feedback: 0, wet: params.chorus }).start();
+                    const offReverb = new Tone.Freeverb({ roomSize: params.room, dampening: 3000, wet: params.wet });
+                    
+                    offPlayer.chain(offFilter, offChorus, offReverb, context.destination);
+                    offPlayer.start(0);
+                }, audioBuffer.duration);
+
+                // 将渲染后的 Buffer 转为 WAV Blob
+                const wavBlob = bufferToWave(renderedBuffer.get(), renderedBuffer.length);
+                
+                // 将文件直接写入用户刚才选择的输出文件夹
+                const newName = `Stereo_${file.name.replace(/\.[^/.]+$/, "")}.wav`;
+                const fileHandle = await outputDirHandle.getFileHandle(newName, { create: true });
+                const writable = await fileHandle.createWritable();
+                await writable.write(wavBlob);
+                await writable.close();
+
+            } catch (err) {
+                console.error(`处理 ${file.name} 时出错:`, err);
+            }
+        }
+
+        logBox.innerText = "✅ 批量处理全部完成！文件已存入目标文件夹。";
+        processBtn.disabled = false;
+        outDirBtn.disabled = false;
+    });
+
+    // 辅助函数：AudioBuffer 转 WAV
+    function bufferToWave(abuffer, len) {
+        let numOfChan = abuffer.numberOfChannels, length = len * numOfChan * 2 + 44;
+        let buffer = new ArrayBuffer(length), view = new DataView(buffer), channels = [], i, sample, offset = 0, pos = 0;
+        const setUint16 = (data) => { view.setUint16(offset, data, true); offset += 2; };
+        const setUint32 = (data) => { view.setUint32(offset, data, true); offset += 4; };
+
+        setUint32(0x46464952); setUint32(length - 8); setUint32(0x45564157); setUint32(0x20746d66);
+        setUint32(16); setUint16(1); setUint16(numOfChan); setUint32(abuffer.sampleRate);
+        setUint32(abuffer.sampleRate * 2 * numOfChan); setUint16(numOfChan * 2); setUint16(16);
+        setUint32(0x61746164); setUint32(length - pos - 4);
+
+        for (i = 0; i < numOfChan; i++) channels.push(abuffer.getChannelData(i));
+        while (pos < len) {
+            for (i = 0; i < numOfChan; i++) {
+                sample = Math.max(-1, Math.min(1, channels[i][pos]));
+                sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
+                view.setInt16(offset, sample, true); offset += 2;
+            }
+            pos++;
+        }
+        return new Blob([buffer], { type: "audio/wav" });
+    }
+</script>
+</body>
+</html>
