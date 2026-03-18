@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>立体声空间生成器 Web 完美打包版</title>
+    <title>立体声空间生成器 Web 终极版</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
@@ -50,11 +50,7 @@
 
     <div class="section">
         <div class="section-title">2. 实时试听 & 调音</div>
-        
-        <select id="previewSelect" disabled>
-            <option value="">请先加载音频...</option>
-        </select>
-        
+        <select id="previewSelect" disabled><option value="">请先加载音频...</option></select>
         <button id="playBtn" class="btn btn-green" style="width: 100%; margin-bottom: 15px;" disabled>▶️ 播放当前选中试听</button>
 
         <div class="slider-row">
@@ -87,7 +83,7 @@
     <div class="section">
         <div class="section-title">3. 渲染导出</div>
         <button id="outDirBtn" class="btn btn-purple" style="width: 100%; margin-bottom: 10px;" disabled>📂 (可选) 指定保存文件夹</button>
-        <div id="outStatus" style="font-size: 12px; color: #666; text-align: center; margin-bottom: 10px;">如果未指定，将自动打包为 ZIP 下载！</div>
+        <div id="outStatus" style="font-size: 12px; color: #666; text-align: center; margin-bottom: 10px; line-height: 1.5;">如果未指定或浏览器不支持，<br>将自动打包为 ZIP 下载！</div>
         
         <button id="processBtn" class="btn btn-blue" style="width: 100%; height: 45px; font-size: 16px;" disabled>🚀 一键批量处理并导出</button>
     </div>
@@ -100,6 +96,7 @@
     let outputDirHandle = null;
     let isPlaying = false;
 
+    // 实时预览音频链
     const liveFilter = new Tone.Filter({ type: "highpass", frequency: 150 });
     const liveChorus = new Tone.Chorus({ rate: 0.5, delayTime: 8, depth: 0.15, feedback: 0, wet: 0.3 }).start();
     const liveReverb = new Tone.Freeverb({ roomSize: 0.85, dampening: 3000, wet: 0.15 });
@@ -114,18 +111,15 @@
     const processBtn = document.getElementById('processBtn');
     const logBox = document.getElementById('logBox');
 
-    // 注意：默认 width 改为了 1.0 (最宽的立体声)
-    const params = { width: 0.1, cutoff: 150, chorus: 0.3, room: 0.85, wet: 0.15 };
+    const params = { width: 1.0, cutoff: 150, chorus: 0.3, room: 0.85, wet: 0.15 };
     
     const bindSlider = (id, paramKey) => {
         const slider = document.getElementById(id);
         const display = document.getElementById(`${id}-val`);
-        
         slider.addEventListener('input', (e) => {
             const val = parseFloat(e.target.value);
             params[paramKey] = val;
             display.innerText = val;
-            
             if (paramKey === 'cutoff') liveFilter.frequency.value = val;
             if (paramKey === 'chorus') liveChorus.wet.value = val;
             if (paramKey === 'room') liveReverb.roomSize.value = val;
@@ -140,7 +134,6 @@
         inputFiles = Array.from(files).filter(f => f.type.startsWith('audio/') || f.name.match(/\.(wav|mp3|flac|m4a)$/i));
         if (inputFiles.length > 0) {
             document.getElementById('fileStatus').innerText = `✅ 已加载 ${inputFiles.length} 个音频文件`;
-            
             previewSelect.innerHTML = "";
             inputFiles.forEach((file, index) => {
                 const option = document.createElement('option');
@@ -148,12 +141,8 @@
                 option.text = file.name;
                 previewSelect.appendChild(option);
             });
-            
-            previewSelect.disabled = false;
-            playBtn.disabled = false;
-            outDirBtn.disabled = false;
-            processBtn.disabled = false;
-            
+            previewSelect.disabled = false; playBtn.disabled = false;
+            outDirBtn.disabled = false; processBtn.disabled = false;
             loadPreviewTrack(0);
         } else {
             alert("未找到支持的音频文件！");
@@ -165,51 +154,47 @@
 
     async function loadPreviewTrack(index) {
         if (livePlayer.state === "started") { livePlayer.stop(); isPlaying = false; }
-        playBtn.innerText = "⏳ 加载试听中...";
-        playBtn.disabled = true;
-        
+        playBtn.innerText = "⏳ 加载试听中..."; playBtn.disabled = true;
         const file = inputFiles[index];
         const url = URL.createObjectURL(file);
         await livePlayer.load(url);
-        
-        playBtn.disabled = false;
-        playBtn.innerText = "▶️ 播放 / 暂停";
+        playBtn.disabled = false; playBtn.innerText = "▶️ 播放 / 暂停";
     }
 
     previewSelect.addEventListener('change', (e) => loadPreviewTrack(e.target.value));
 
     playBtn.addEventListener('click', async () => {
         await Tone.start();
-        if (isPlaying) {
-            livePlayer.stop();
-            playBtn.innerText = "▶️ 播放 / 暂停";
-        } else {
-            livePlayer.start();
-            playBtn.innerText = "⏸️ 暂停";
-        }
+        if (isPlaying) { livePlayer.stop(); playBtn.innerText = "▶️ 播放 / 暂停"; } 
+        else { livePlayer.start(); playBtn.innerText = "⏸️ 暂停"; }
         isPlaying = !isPlaying;
     });
 
+    // 目录选择与安全拦截提示
     outDirBtn.addEventListener('click', async () => {
+        if (!window.showDirectoryPicker) {
+            alert("❌ 您的当前环境不支持直接选择文件夹！\n\n原因：您可能是在本地双击打开了 HTML 文件 (file:///开头)。\n\n解决办法：请将网页部署到 Cloudflare，在真实的 HTTPS 网址下即可完美使用！否则程序会自动打包成 ZIP 下载。");
+            return;
+        }
         try {
             outputDirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-            document.getElementById('outStatus').innerText = `✅ 导出时将静默保存至: ${outputDirHandle.name}`;
+            document.getElementById('outStatus').innerText = `✅ 授权成功！导出时将静默保存至: ${outputDirHandle.name}`;
+            document.getElementById('outStatus').style.color = "#4CAF50";
         } catch (err) {
-            console.log("用户取消");
+            console.warn("用户取消或授权失败", err);
+            alert("⚠️ 文件夹授权失败！\n如果继续，程序将自动把处理好的文件打包成 ZIP 下载。");
         }
     });
 
+    // 核心离线渲染与导出
     processBtn.addEventListener('click', async () => {
         if (livePlayer.state === "started") { livePlayer.stop(); isPlaying = false; playBtn.innerText = "▶️ 播放 / 暂停"; }
-        
         processBtn.disabled = true;
         await Tone.start(); 
         
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        
-        // 初始化 JSZip 实例
         const zip = new JSZip();
-        const useZip = !outputDirHandle; // 如果没有选择输出文件夹，就使用 ZIP 打包
+        const useZip = !outputDirHandle; 
 
         for (let i = 0; i < inputFiles.length; i++) {
             const file = inputFiles[i];
@@ -219,7 +204,8 @@
             try {
                 const arrayBuffer = await file.arrayBuffer();
                 const nativeAudioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-                const renderDuration = nativeAudioBuffer.duration + 2.5;
+                const renderDuration = nativeAudioBuffer.duration + 2.5; // 混响尾音保护
+                
                 const toneAudioBuffer = new Tone.ToneAudioBuffer(nativeAudioBuffer);
 
                 const renderedBuffer = await Tone.Offline(({ transport }) => {
@@ -229,9 +215,10 @@
                     const offReverb = new Tone.Freeverb({ roomSize: params.room, dampening: 3000, wet: params.wet });
                     const offWidener = new Tone.StereoWidener(params.width);
                     
+                    // 完美节点串联
                     offPlayer.chain(offFilter, offChorus, offReverb, offWidener, Tone.Destination);
                     offPlayer.start(0);
-                    transport.start(0);
+                    transport.start(0); // 启动引擎
                 }, renderDuration, 2, nativeAudioBuffer.sampleRate); 
 
                 const wavBlob = bufferToWave(renderedBuffer.get(), renderedBuffer.length);
@@ -243,16 +230,18 @@
                         const writable = await fileHandle.createWritable();
                         await writable.write(wavBlob);
                         await writable.close();
-                    } catch (e) { console.warn("写入本地文件夹失败:", e); }
+                    } catch (e) { 
+                        console.warn("写入文件夹失败，加入 ZIP 队列", e); 
+                        zip.file(newName, wavBlob);
+                    }
                 } else {
-                    // 如果没选文件夹，把文件塞进 ZIP 包里
                     zip.file(newName, wavBlob);
                 }
             } catch (err) { console.error(`处理出错:`, err); }
         }
 
-        // 如果使用的是 ZIP 模式，在这里统一触发一次下载！
-        if (useZip) {
+        // 打包下载 ZIP
+        if (useZip || Object.keys(zip.files).length > 0) {
             logBox.innerText = "📦 渲染完毕！正在为您打包成 ZIP 文件...";
             try {
                 const zipContent = await zip.generateAsync({ type: "blob" });
@@ -260,24 +249,21 @@
                 const a = document.createElement('a');
                 a.style.display = 'none';
                 a.href = url;
-                a.download = "Stereo_Processed_Audio.zip"; // 你的压缩包名字
+                a.download = "Stereo_Processed_Audio.zip";
                 document.body.appendChild(a);
                 a.click();
-                
-                // 延迟释放 URL，确保浏览器有足够时间下载
                 setTimeout(() => {
                     document.body.removeChild(a);
                     URL.revokeObjectURL(url);
                 }, 2000);
-            } catch (e) {
-                console.error("ZIP 打包失败", e);
-            }
+            } catch (e) { console.error("ZIP 打包失败", e); }
         }
 
-        logBox.innerText = "🎉 处理完成！请检查您的下载目录。";
+        logBox.innerText = "🎉 处理完成！请检查您的本地文件夹或下载目录。";
         processBtn.disabled = false;
     });
 
+    // WAV 打包算法 (修复了 Length 头)
     function bufferToWave(abuffer, len) {
         let numOfChan = abuffer.numberOfChannels, length = len * numOfChan * 2 + 44;
         let buffer = new ArrayBuffer(length), view = new DataView(buffer), channels = [], i, sample, offset = 0, pos = 0;
