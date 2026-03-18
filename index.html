@@ -25,7 +25,7 @@
         .btn-play:hover { background: #45a049; }
         .btn-batch { background: #FF9800; }
         .btn-batch:hover { background: #F57C00; }
-        .btn:disabled { background: #ccc; cursor: not-allowed; }
+        .btn:disabled { background: #ccc; cursor: not-allowed; opacity: 0.7;}
         
         /* 上传与队列区域样式 */
         .upload-buttons { display: flex; gap: 10px; margin-top: 10px; margin-bottom: 20px;}
@@ -128,8 +128,13 @@
     
     // --- 核心逻辑 1：处理文件上传并生成队列 ---
     const handleFiles = async (files) => {
-        const audioFiles = Array.from(files).filter(f => f.type.startsWith('audio/'));
-        if (audioFiles.length === 0) return;
+        // 增加正则表达式兜底，防止某些浏览器读取不到 file.type
+        const audioFiles = Array.from(files).filter(f => f.type.startsWith('audio/') || f.name.match(/\.(wav|mp3|m4a|ogg|flac|aac)$/i));
+        
+        if (audioFiles.length === 0) {
+            alert("未检测到有效的音频文件！");
+            return;
+        }
 
         fileQueue = audioFiles.map(f => ({
             file: f,
@@ -144,7 +149,11 @@
 
         if (player) { player.stop(); player.dispose(); }
         const previewUrl = URL.createObjectURL(fileQueue[0].file);
-        player = new Tone.Player(previewUrl).chain(filter, chorus, reverb, Tone.Destination);
+        
+        // 预览播放器：串接所有节点，最后由最后一个节点输出到全局扬声器
+        player = new Tone.Player(previewUrl);
+        player.chain(filter, chorus, reverb);
+        reverb.toDestination(); // 标准化连接方式
         
         playBtn.innerText = "⏳ 加载中...";
         await Tone.loaded();
@@ -217,7 +226,7 @@
     bindSlider('room', reverb, 'roomSize');
     bindSlider('wet', reverb, 'wet');
 
-    // --- 核心逻辑 3：批量后台渲染 (已修复 Tone.Destination) ---
+    // --- 核心逻辑 3：批量后台渲染 (终极排雷版) ---
     batchExportBtn.addEventListener('click', async () => {
         if (fileQueue.length === 0) return;
         
@@ -244,14 +253,18 @@
                 const currentRoom = reverb.roomSize.value;
                 const currentReverbWet = reverb.wet.value;
 
-                // Tone.Offline 的正确用法
+                // 重点修复区：Tone.Offline 需要严格的内联式连接
                 const renderedBuffer = await Tone.Offline(() => {
                     const offPlayer = new Tone.Player(audioBuffer);
                     const offFilter = new Tone.Filter({ type: "highpass", frequency: currentCutoff });
                     const offChorus = new Tone.Chorus({ rate: 0.5, delayTime: 8, depth: 0.15, feedback: 0, wet: currentChorusWet }).start();
                     const offReverb = new Tone.Freeverb({ roomSize: currentRoom, dampening: 3000, wet: currentReverbWet });
                     
-                    offPlayer.chain(offFilter, offChorus, offReverb, Tone.Destination);
+                    // 1. 将源节点和效果器按顺序链在一起
+                    offPlayer.chain(offFilter, offChorus, offReverb);
+                    // 2. [绝杀修复]：将最后一个效果器输出到当前离线上下文的目标 (toDestination)，而非全局目标
+                    offReverb.toDestination();
+                    
                     offPlayer.start(0);
                 }, audioBuffer.duration);
 
