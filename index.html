@@ -3,39 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>立体声空间生成器 Web 版</title>
+    <title>立体声空间生成器 Web 批量版</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <style>
-        body { font-family: 'Microsoft YaHei', sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; padding-top: 50px; }
-        .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 500px; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; padding-top: 50px; padding-bottom: 50px; }
+        .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 600px; }
         h2 { margin-top: 0; color: #333; text-align: center; }
-        .control-group { margin-bottom: 20px; padding: 15px; border: 1px solid #e0e0e0; border-radius: 8px; }
+        
+        /* 布局样式 */
+        .control-group { margin-bottom: 20px; padding: 15px; border: 1px solid #e0e0e0; border-radius: 8px; background: #fafafa; }
         .slider-row { display: flex; align-items: center; margin-bottom: 15px; }
         .slider-row:last-child { margin-bottom: 0; }
-        label { width: 180px; font-size: 14px; color: #555; }
+        label { width: 180px; font-size: 14px; color: #555; font-weight: bold;}
         input[type="range"] { flex-grow: 1; margin: 0 10px; }
         .value-display { width: 40px; text-align: right; font-size: 14px; font-weight: bold; color: #2196F3; }
+        
+        /* 按钮样式 */
         .btn-group { display: flex; gap: 10px; margin-top: 15px; }
-        .btn { flex: 1; padding: 12px; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; transition: background 0.3s; }
+        .btn { flex: 1; padding: 12px; color: white; border: none; border-radius: 6px; font-size: 15px; cursor: pointer; transition: background 0.3s; font-weight: bold;}
         .btn-play { background: #4CAF50; }
         .btn-play:hover { background: #45a049; }
         .btn-export { background: #2196F3; }
         .btn-export:hover { background: #1976D2; }
+        .btn-batch { background: #FF9800; }
+        .btn-batch:hover { background: #F57C00; }
         .btn:disabled { background: #ccc; cursor: not-allowed; }
-        .file-input-wrapper { margin-bottom: 20px; }
+        
+        /* 上传与队列区域样式 */
+        .upload-buttons { display: flex; gap: 10px; margin-top: 10px; margin-bottom: 20px;}
+        .upload-label { flex: 1; text-align: center; background: #e3f2fd; color: #1976D2; border: 2px dashed #90caf9; padding: 15px; border-radius: 8px; cursor: pointer; transition: 0.3s; font-weight: bold; font-size: 14px; }
+        .upload-label:hover { background: #bbdefb; }
+        
+        /* 表格样式 */
+        .queue-container { max-height: 250px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 20px; display: none; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+        th, td { padding: 10px; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; position: sticky; top: 0; z-index: 1; color: #555;}
+        .file-name { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .status-wait { color: #9e9e9e; }
+        .status-processing { color: #2196F3; font-weight: bold; }
+        .status-done { color: #4CAF50; font-weight: bold; }
+        .status-error { color: #f44336; font-weight: bold; }
+        .btn-download { background: #4CAF50; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 12px; display: inline-block;}
+        .btn-download:hover { background: #388E3C; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>🎧 立体声空间生成器 Pro</h2>
+    <h2>🎧 立体声空间批量生成器 Max</h2>
     
     <div class="file-input-wrapper">
-        <label for="audioUpload"><b>1. 选择音频文件:</b></label>
-        <input type="file" id="audioUpload" accept="audio/*">
+        <label style="font-size: 16px; color: #333;"><b>1. 导入音频 (单文件/多文件/文件夹):</b></label>
+        <div class="upload-buttons">
+            <label class="upload-label">
+                📁 选择文件夹导入
+                <input type="file" id="folderUpload" webkitdirectory directory multiple style="display:none;">
+            </label>
+            <label class="upload-label">
+                📄 选择多文件导入
+                <input type="file" id="fileUpload" accept="audio/*" multiple style="display:none;">
+            </label>
+        </div>
+    </div>
+
+    <div class="queue-container" id="queueContainer">
+        <table>
+            <thead>
+                <tr>
+                    <th>文件名</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="queueBody">
+                </tbody>
+        </table>
     </div>
 
     <div class="control-group">
+        <div style="margin-bottom: 10px; font-size: 12px; color: #888;">* 调整参数时，播放器会自动试听队列中的<b>第一个</b>文件</div>
         <div class="slider-row">
             <label>高通滤波 (低音切除):</label>
             <input type="range" id="cutoff" min="20" max="1000" step="1" value="150">
@@ -59,51 +106,106 @@
     </div>
 
     <div class="btn-group">
-        <button id="playBtn" class="btn btn-play" disabled>▶️ 播放 / 试听</button>
-        <button id="exportBtn" class="btn btn-export" disabled>💾 导出音频</button>
+        <button id="playBtn" class="btn btn-play" disabled>▶️ 试听首个文件</button>
+        <button id="batchExportBtn" class="btn btn-batch" disabled>🚀 开始批量生成</button>
     </div>
 </div>
 
 <script>
-    // 效果器初始化
+    // --- 实时试听效果器初始化 ---
     const filter = new Tone.Filter({ type: "highpass", frequency: 150 });
     const chorus = new Tone.Chorus({ rate: 0.5, delayTime: 8, depth: 0.15, feedback: 0, wet: 0.3 }).start();
     const reverb = new Tone.Freeverb({ roomSize: 0.85, dampening: 3000, wet: 0.15 });
     
     let player = null;
     let isPlaying = false;
-    let currentFileName = "output";
+    
+    // --- 队列状态管理 ---
+    let fileQueue = []; // 存储所有待处理文件的数组
+    const queueBody = document.getElementById('queueBody');
+    const queueContainer = document.getElementById('queueContainer');
 
     const playBtn = document.getElementById('playBtn');
-    const exportBtn = document.getElementById('exportBtn');
-    const audioUpload = document.getElementById('audioUpload');
+    const batchExportBtn = document.getElementById('batchExportBtn');
     
-    // 文件上传处理
-    audioUpload.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        
-        currentFileName = file.name.replace(/\.[^/.]+$/, ""); // 去掉扩展名
-        if (player) { player.stop(); player.dispose(); }
+    // --- 核心逻辑 1：处理文件上传并生成队列 ---
+    const handleFiles = async (files) => {
+        // 过滤非音频文件
+        const audioFiles = Array.from(files).filter(f => f.type.startsWith('audio/'));
+        if (audioFiles.length === 0) return;
 
-        const url = URL.createObjectURL(file);
-        player = new Tone.Player(url).chain(filter, chorus, reverb, Tone.Destination);
+        // 初始化队列数据
+        fileQueue = audioFiles.map(f => ({
+            file: f,
+            name: f.name.replace(/\.[^/.]+$/, ""), // 去除后缀名
+            status: 'wait', // wait, processing, done, error
+            url: null 
+        }));
+
+        renderQueueTable();
+        queueContainer.style.display = 'block';
+        batchExportBtn.disabled = false;
+
+        // 加载第一个文件用于试听
+        if (player) { player.stop(); player.dispose(); }
+        const previewUrl = URL.createObjectURL(fileQueue[0].file);
+        player = new Tone.Player(previewUrl).chain(filter, chorus, reverb, Tone.Destination);
         
+        playBtn.innerText = "⏳ 加载中...";
         await Tone.loaded();
         playBtn.disabled = false;
-        exportBtn.disabled = false;
-        playBtn.innerText = "▶️ 播放 / 试听";
-    });
+        playBtn.innerText = "▶️ 试听首个文件";
+    };
 
-    // 播放/暂停控制
+    document.getElementById('folderUpload').addEventListener('change', (e) => handleFiles(e.target.files));
+    document.getElementById('fileUpload').addEventListener('change', (e) => handleFiles(e.target.files));
+
+    // --- 核心逻辑 2：渲染/更新表格 UI ---
+    function renderQueueTable() {
+        queueBody.innerHTML = fileQueue.map((item, index) => `
+            <tr>
+                <td class="file-name" title="${item.file.name}">${item.file.name}</td>
+                <td id="status-${index}" class="status-${item.status}">${getStatusText(item.status)}</td>
+                <td id="action-${index}">
+                    ${item.status === 'done' ? `<a href="${item.url}" download="Stereo_${item.name}.wav" class="btn-download">💾 存本地</a>` : '-'}
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function getStatusText(status) {
+        switch(status) {
+            case 'wait': return '⏳ 等待中';
+            case 'processing': return '🔄 处理中...';
+            case 'done': return '✅ 完成';
+            case 'error': return '❌ 失败';
+            default: return '';
+        }
+    }
+
+    // 局部更新队列中某一行，避免整个表格重绘
+    function updateQueueItemUI(index) {
+        const item = fileQueue[index];
+        const statusTd = document.getElementById(`status-${index}`);
+        const actionTd = document.getElementById(`action-${index}`);
+        
+        statusTd.className = `status-${item.status}`;
+        statusTd.innerText = getStatusText(item.status);
+        
+        if (item.status === 'done') {
+            actionTd.innerHTML = `<a href="${item.url}" download="Stereo_${item.name}.wav" class="btn-download">💾 存本地</a>`;
+        }
+    }
+
+    // --- 播放/暂停控制 ---
     playBtn.addEventListener('click', async () => {
         await Tone.start();
-        if (isPlaying) { player.stop(); playBtn.innerText = "▶️ 播放 / 试听"; } 
+        if (isPlaying) { player.stop(); playBtn.innerText = "▶️ 试听首个文件"; } 
         else { player.start(); playBtn.innerText = "⏸️ 暂停"; }
         isPlaying = !isPlaying;
     });
 
-    // 参数绑定
+    // --- 参数绑定 ---
     const bindSlider = (id, effectNode, paramKey) => {
         const slider = document.getElementById(id);
         const display = document.getElementById(`${id}-val`);
@@ -121,71 +223,92 @@
     bindSlider('room', reverb, 'roomSize');
     bindSlider('wet', reverb, 'wet');
 
-    // 导出音频核心逻辑 (后台快速渲染)
-    exportBtn.addEventListener('click', async () => {
-        if (!player || !player.buffer) return;
+    // --- 核心逻辑 3：批量后台渲染 ---
+    batchExportBtn.addEventListener('click', async () => {
+        if (fileQueue.length === 0) return;
         
-        exportBtn.innerText = "⏳ 正在渲染...";
-        exportBtn.disabled = true;
+        batchExportBtn.disabled = true;
+        batchExportBtn.innerText = "🚀 正在批量处理...";
+        playBtn.disabled = true; // 处理时禁用播放，防冲突
+        
+        // 创建原生的 AudioContext 专门用于后台解码音频文件
+        const decodeCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-        try {
-            // 使用 Tone.Offline 进行后台极速渲染
-            const renderedBuffer = await Tone.Offline(({ context }) => {
-                const offPlayer = new Tone.Player(player.buffer);
-                const offFilter = new Tone.Filter({ type: "highpass", frequency: filter.frequency.value });
-                const offChorus = new Tone.Chorus({ rate: 0.5, delayTime: 8, depth: 0.15, feedback: 0, wet: chorus.wet.value }).start();
-                const offReverb = new Tone.Freeverb({ roomSize: reverb.roomSize.value, dampening: 3000, wet: reverb.wet.value });
+        for (let i = 0; i < fileQueue.length; i++) {
+            let item = fileQueue[i];
+            
+            // 跳过已完成的
+            if (item.status === 'done') continue; 
+
+            // 更新状态为处理中
+            item.status = 'processing';
+            updateQueueItemUI(i);
+
+            try {
+                // 1. 将文件转为 ArrayBuffer 并解码为 AudioBuffer
+                const arrayBuffer = await item.file.arrayBuffer();
+                const audioBuffer = await decodeCtx.decodeAudioData(arrayBuffer);
+
+                // 2. 获取当前用户设置好的特效参数
+                const currentCutoff = filter.frequency.value;
+                const currentChorusWet = chorus.wet.value;
+                const currentRoom = reverb.roomSize.value;
+                const currentReverbWet = reverb.wet.value;
+
+                // 3. 使用 Tone.Offline 进行纯后台极速渲染
+                const renderedBuffer = await Tone.Offline(({ context }) => {
+                    const offPlayer = new Tone.Player(audioBuffer);
+                    const offFilter = new Tone.Filter({ type: "highpass", frequency: currentCutoff });
+                    const offChorus = new Tone.Chorus({ rate: 0.5, delayTime: 8, depth: 0.15, feedback: 0, wet: currentChorusWet }).start();
+                    const offReverb = new Tone.Freeverb({ roomSize: currentRoom, dampening: 3000, wet: currentReverbWet });
+                    
+                    offPlayer.chain(offFilter, offChorus, offReverb, context.destination);
+                    offPlayer.start(0);
+                }, audioBuffer.duration);
+
+                // 4. 将渲染好的 AudioBuffer 转换为 WAV Blob
+                const wavBlob = bufferToWave(renderedBuffer.get(), renderedBuffer.length);
                 
-                offPlayer.chain(offFilter, offChorus, offReverb, context.destination);
-                offPlayer.start(0);
-            }, player.buffer.duration);
+                // 5. 保存结果 URL 并更新状态
+                item.url = URL.createObjectURL(wavBlob);
+                item.status = 'done';
 
-            // 将 AudioBuffer 转换为 WAV Blob
-            const wavBlob = bufferToWave(renderedBuffer.get(), renderedBuffer.length);
+            } catch (error) {
+                console.error(`文件 ${item.name} 处理失败:`, error);
+                item.status = 'error';
+            }
             
-            // 触发下载
-            const url = URL.createObjectURL(wavBlob);
-            const anchor = document.createElement('a');
-            anchor.download = `Stereo_${currentFileName}.wav`;
-            anchor.href = url;
-            anchor.click();
-            URL.revokeObjectURL(url);
-            
-        } catch (error) {
-            alert("导出失败，请重试！");
-            console.error(error);
-        } finally {
-            exportBtn.innerText = "💾 导出音频";
-            exportBtn.disabled = false;
+            // 更新该行的 UI
+            updateQueueItemUI(i);
         }
+
+        batchExportBtn.innerText = "✅ 批量处理完成！";
+        playBtn.disabled = false;
+        
+        // 3秒后恢复按钮状态，允许重新点击
+        setTimeout(() => {
+            batchExportBtn.innerText = "🚀 再次批量生成";
+            batchExportBtn.disabled = false;
+        }, 3000);
     });
 
-    // 辅助函数：AudioBuffer 转 WAV 格式 (纯前端实现)
+    // --- 辅助函数：AudioBuffer 转 WAV (纯前端实现) ---
     function bufferToWave(abuffer, len) {
         let numOfChan = abuffer.numberOfChannels, length = len * numOfChan * 2 + 44;
         let buffer = new ArrayBuffer(length), view = new DataView(buffer), channels = [], i, sample, offset = 0, pos = 0;
         const setUint16 = (data) => { view.setUint16(offset, data, true); offset += 2; };
         const setUint32 = (data) => { view.setUint32(offset, data, true); offset += 4; };
 
-        setUint32(0x46464952); // "RIFF"
-        setUint32(length - 8); // file length - 8
-        setUint32(0x45564157); // "WAVE"
-        setUint32(0x20746d66); // "fmt " chunk
-        setUint32(16);         // length = 16
-        setUint16(1);          // PCM (uncompressed)
-        setUint16(numOfChan);
-        setUint32(abuffer.sampleRate);
-        setUint32(abuffer.sampleRate * 2 * numOfChan); // avg. bytes/sec
-        setUint16(numOfChan * 2); // block-align
-        setUint16(16);         // 16-bit
-        setUint32(0x61746164); // "data" - chunk
-        setUint32(length - pos - 4); // chunk length
+        setUint32(0x46464952); setUint32(length - 8); setUint32(0x45564157); setUint32(0x20746d66);
+        setUint32(16); setUint16(1); setUint16(numOfChan); setUint32(abuffer.sampleRate);
+        setUint32(abuffer.sampleRate * 2 * numOfChan); setUint16(numOfChan * 2); setUint16(16);
+        setUint32(0x61746164); setUint32(length - pos - 4);
 
         for (i = 0; i < numOfChan; i++) channels.push(abuffer.getChannelData(i));
         while (pos < len) {
             for (i = 0; i < numOfChan; i++) {
-                sample = Math.max(-1, Math.min(1, channels[i][pos])); // clamp
-                sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0; // scale to 16-bit signed int
+                sample = Math.max(-1, Math.min(1, channels[i][pos]));
+                sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
                 view.setInt16(offset, sample, true);
                 offset += 2;
             }
