@@ -132,17 +132,22 @@
                 const arrayBuffer = await file.arrayBuffer();
                 const audioBuffer = await Tone.context.decodeAudioData(arrayBuffer);
                 
-                const renderedBuffer = await Tone.Offline(() => {  // 1. 去掉了 ({ context })
-                      const offPlayer = new Tone.Player(audioBuffer);
-                      const offFilter = new Tone.Filter({ type: "highpass", frequency: params.cutoff });
-                      const offChorus = new Tone.Chorus({ rate: 0.5, delayTime: 8, depth: 0.15, feedback: 0, wet: params.chorus }).start();
-                      const offReverb = new Tone.Freeverb({ roomSize: params.room, dampening: 3000, wet: params.wet });
-    
-                // 2. 将 context.destination 改为 Tone.Destination
-                offPlayer.chain(offFilter, offChorus, offReverb, Tone.Destination); 
-                offPlayer.start(0);
+                // 使用 OfflineAudioContext 后台极速渲染
+                const renderedBuffer = await Tone.Offline((context) => {  // 注意这里：只有 context，没有大括号
+                    const offPlayer = new Tone.Player(audioBuffer);
+                    const offFilter = new Tone.Filter({ type: "highpass", frequency: params.cutoff });
+                    const offChorus = new Tone.Chorus({ rate: 0.5, delayTime: 8, depth: 0.15, feedback: 0, wet: params.chorus }).start();
+                    const offReverb = new Tone.Freeverb({ roomSize: params.room, dampening: 3000, wet: params.wet });
+                    
+                    // 1. 先把播放器和所有效果器串联起来
+                    offPlayer.chain(offFilter, offChorus, offReverb);
+                    
+                    // 2. 将最后一个效果器(混响)专门插到“离线输出接口”上
+                    offReverb.connect(context.destination);
+                    
+                    offPlayer.start(0);
                 }, audioBuffer.duration);
-
+                
                 const wavBlob = bufferToWave(renderedBuffer.get(), renderedBuffer.length);
                 const newName = `Stereo_${file.name.replace(/\.[^/.]+$/, "")}.wav`;
 
