@@ -3,76 +3,106 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>立体声空间生成器 Web 终极版</title>
+    <title>音频空间生成器 - 达芬奇专业版</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
-        body { font-family: 'Microsoft YaHei', sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; padding-top: 50px; padding-bottom: 50px; }
-        .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 700px; }
-        h2 { margin-top: 0; color: #333; text-align: center; }
+        /* 达芬奇暗黑主题风格 */
+        body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; background-color: #121212; display: flex; justify-content: center; padding-top: 30px; padding-bottom: 50px; color: #b0b0b0; }
+        .container { background: #1e1e1e; padding: 25px 35px; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 600px; border: 1px solid #333; }
+        h2 { margin-top: 0; color: #e0e0e0; text-align: center; font-weight: 500; font-size: 20px; border-bottom: 1px solid #333; padding-bottom: 15px;}
         
-        .control-group { margin-bottom: 20px; padding: 15px; border: 1px solid #e0e0e0; border-radius: 8px; background: #fafafa; }
-        .slider-row { display: flex; align-items: center; margin-bottom: 15px; }
-        .slider-row:last-child { margin-bottom: 0; }
-        label { width: 180px; font-size: 14px; color: #555; font-weight: bold;}
-        input[type="range"] { flex-grow: 1; margin: 0 10px; }
-        .value-display { width: 40px; text-align: right; font-size: 14px; font-weight: bold; color: #2196F3; }
-        
-        .btn-group { display: flex; gap: 8px; margin-top: 15px; flex-wrap: wrap; }
-        .btn { flex: 1; min-width: 140px; padding: 12px; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; transition: background 0.3s; font-weight: bold; text-align: center;}
-        .btn-play { background: #4CAF50; }
-        .btn-play:hover { background: #45a049; }
-        .btn-batch { background: #FF9800; }
-        .btn-batch:hover { background: #F57C00; }
-        .btn-zip { background: #9C27B0; }
-        .btn-zip:hover { background: #7B1FA2; }
-        .btn-folder { background: #E91E63; }
-        .btn-folder:hover { background: #C2185B; }
-        .btn:disabled { background: #ccc; cursor: not-allowed; opacity: 0.7;}
-        
+        /* 文件上传区 */
         .upload-buttons { display: flex; gap: 10px; margin-top: 10px; margin-bottom: 20px;}
-        .upload-label { flex: 1; text-align: center; background: #e3f2fd; color: #1976D2; border: 2px dashed #90caf9; padding: 15px; border-radius: 8px; cursor: pointer; transition: 0.3s; font-weight: bold; font-size: 14px; }
-        .upload-label:hover { background: #bbdefb; }
+        .upload-label { flex: 1; text-align: center; background: #2a2a2a; color: #aaa; border: 1px dashed #555; padding: 12px; border-radius: 4px; cursor: pointer; transition: 0.2s; font-size: 13px; }
+        .upload-label:hover { background: #333; color: #fff; border-color: #777;}
         
-        .queue-container { max-height: 250px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 20px; display: none; }
-        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
-        th, td { padding: 10px; border-bottom: 1px solid #eee; }
-        th { background: #f8f9fa; position: sticky; top: 0; z-index: 1; color: #555;}
-        .file-name { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .status-wait { color: #9e9e9e; }
-        .status-processing { color: #2196F3; font-weight: bold; }
-        .status-done { color: #4CAF50; font-weight: bold; }
-        .status-error { color: #f44336; font-weight: bold; }
-        .btn-download { background: #4CAF50; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 12px; display: inline-block;}
-        .btn-download:hover { background: #388E3C; }
+        /* 队列区域 */
+        .queue-container { max-height: 200px; overflow-y: auto; border: 1px solid #333; border-radius: 4px; margin-bottom: 20px; display: none; background: #1a1a1a; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; }
+        th, td { padding: 8px 12px; border-bottom: 1px solid #2a2a2a; }
+        th { background: #252525; position: sticky; top: 0; z-index: 1; color: #888; font-weight: normal;}
+        .file-name { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #ddd; }
+        .status-wait { color: #888; }
+        .status-processing { color: #00bcd4; }
+        .status-done { color: #4CAF50; }
+        .status-error { color: #f44336; }
+        
+        /* 专业控制面板样式 (致敬 DaVinci) */
+        .control-group { padding: 15px 0; border-top: 1px solid #333; }
+        .panel-title { color: #fff; font-size: 13px; margin-bottom: 15px; display: flex; align-items: center; }
+        .panel-title::before { content: ''; display: inline-block; width: 8px; height: 8px; background: #f44336; border-radius: 50%; margin-right: 8px; box-shadow: 0 0 5px #f44336; }
+        
+        .slider-row { display: flex; align-items: center; margin-bottom: 12px; justify-content: space-between;}
+        label { width: 140px; font-size: 12px; color: #aaa; text-align: right; padding-right: 15px; }
+        input[type="range"] { 
+            flex-grow: 1; 
+            -webkit-appearance: none; 
+            background: #333; 
+            height: 4px; 
+            border-radius: 2px; 
+            outline: none; 
+        }
+        input[type="range"]::-webkit-slider-thumb { 
+            -webkit-appearance: none; 
+            width: 12px; height: 12px; 
+            background: #888; 
+            border-radius: 50%; 
+            cursor: pointer; 
+            transition: 0.1s;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover { background: #fff; transform: scale(1.2);}
+        
+        .value-box { 
+            width: 50px; 
+            background: #111; 
+            border: 1px solid #333; 
+            color: #ddd; 
+            text-align: center; 
+            padding: 3px 0; 
+            font-size: 12px; 
+            border-radius: 3px; 
+            margin-left: 15px;
+            font-family: monospace;
+        }
+
+        /* 按钮组 */
+        .btn-group { display: flex; gap: 10px; margin-top: 20px; border-top: 1px solid #333; padding-top: 20px;}
+        .btn { flex: 1; padding: 10px; color: #fff; border: none; border-radius: 4px; font-size: 13px; cursor: pointer; transition: 0.2s; text-align: center; background: #333;}
+        .btn:hover { background: #444; }
+        .btn-play { background: #2e7d32; }
+        .btn-play:hover { background: #388e3c; }
+        .btn-batch { background: #1565c0; }
+        .btn-batch:hover { background: #1976d2; }
+        .btn-zip { background: #6a1b9a; }
+        .btn-zip:hover { background: #7b1fa2; }
+        .btn-folder { background: #c62828; }
+        .btn-folder:hover { background: #d32f2f; }
+        .btn:disabled { background: #222; color: #555; cursor: not-allowed; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>🎧 立体声空间生成器 终极全自动版</h2>
+    <h2>Fairlight Audio Web Processor</h2>
     
-    <div class="file-input-wrapper">
-        <label style="font-size: 16px; color: #333;"><b>1. 导入音频 (单文件/多文件/文件夹):</b></label>
-        <div class="upload-buttons">
-            <label class="upload-label">
-                📁 选择文件夹导入
-                <input type="file" id="folderUpload" webkitdirectory directory multiple style="display:none;">
-            </label>
-            <label class="upload-label">
-                📄 选择多文件导入
-                <input type="file" id="fileUpload" accept="audio/*" multiple style="display:none;">
-            </label>
-        </div>
+    <div class="upload-buttons">
+        <label class="upload-label">
+            📁 选择文件夹导入 (Folder)
+            <input type="file" id="folderUpload" webkitdirectory directory multiple style="display:none;">
+        </label>
+        <label class="upload-label">
+            📄 选择多文件导入 (Files)
+            <input type="file" id="fileUpload" accept="audio/*" multiple style="display:none;">
+        </label>
     </div>
 
     <div class="queue-container" id="queueContainer">
         <table>
             <thead>
                 <tr>
-                    <th>文件名</th>
-                    <th>状态</th>
-                    <th>操作</th>
+                    <th>文件名 (File Name)</th>
+                    <th>状态 (Status)</th>
                 </tr>
             </thead>
             <tbody id="queueBody"></tbody>
@@ -80,38 +110,49 @@
     </div>
 
     <div class="control-group">
-        <div style="margin-bottom: 10px; font-size: 12px; color: #888;">* 调整参数时，播放器会自动试听队列中的<b>第一个</b>文件</div>
+        <div class="panel-title">Reverb & Space (空间混响参数)</div>
+        
         <div class="slider-row">
-            <label>高通滤波 (低音切除):</label>
+            <label>房间大小 (Room Size)</label>
+            <input type="range" id="room" min="0" max="1" step="0.01" value="0.85">
+            <div class="value-box" id="room-val">0.85</div>
+        </div>
+        
+        <div class="slider-row">
+            <label>明亮度 (Brightness)</label>
+            <input type="range" id="brightness" min="1000" max="10000" step="100" value="3000">
+            <div class="value-box" id="brightness-val">3000</div>
+        </div>
+
+        <div class="slider-row">
+            <label>干/湿比例 (Dry / Wet)</label>
+            <input type="range" id="wet" min="0" max="1" step="0.01" value="0.15">
+            <div class="value-box" id="wet-val">0.15</div>
+        </div>
+
+        <div class="slider-row" style="margin-top: 25px;">
+            <label>早期反射增强 (Chorus)</label>
+            <input type="range" id="chorus" min="0" max="1" step="0.01" value="0.30">
+            <div class="value-box" id="chorus-val">0.30</div>
+        </div>
+
+        <div class="slider-row">
+            <label>低切频率 (Low Cut)</label>
             <input type="range" id="cutoff" min="20" max="1000" step="1" value="150">
-            <span class="value-display" id="cutoff-val">150</span>
-        </div>
-        <div class="slider-row">
-            <label>合唱强度 (空间感):</label>
-            <input type="range" id="chorus" min="0" max="1" step="0.05" value="0.3">
-            <span class="value-display" id="chorus-val">0.3</span>
-        </div>
-        <div class="slider-row">
-            <label>混响房间大小:</label>
-            <input type="range" id="room" min="0" max="1" step="0.05" value="0.85">
-            <span class="value-display" id="room-val">0.85</span>
-        </div>
-        <div class="slider-row">
-            <label>混响湿声 (Wet):</label>
-            <input type="range" id="wet" min="0" max="1" step="0.05" value="0.15">
-            <span class="value-display" id="wet-val">0.15</span>
+            <div class="value-box" id="cutoff-val">150</div>
         </div>
     </div>
 
     <div class="btn-group">
-        <button id="playBtn" class="btn btn-play" disabled>▶️ 试听</button>
-        <button id="batchExportBtn" class="btn btn-batch" disabled>🚀 开始批量生成</button>
-        <button id="zipBtn" class="btn btn-zip" disabled>📦 打包 ZIP</button>
-        <button id="folderSaveBtn" class="btn btn-folder" disabled>📂 直接存入文件夹</button>
+        <button id="playBtn" class="btn btn-play" disabled>▶ 试听 (Play)</button>
+        <button id="batchExportBtn" class="btn btn-batch" disabled>🚀 批量渲染 (Render)</button>
+        <button id="zipBtn" class="btn btn-zip" disabled>📦 打包 (ZIP)</button>
+        <button id="folderSaveBtn" class="btn btn-folder" disabled>📂 输出到目录 (Dir)</button>
     </div>
 </div>
 
 <script>
+    // 效果器核心
     const filter = new Tone.Filter({ type: "highpass", frequency: 150 });
     const chorus = new Tone.Chorus({ rate: 0.5, delayTime: 8, depth: 0.15, feedback: 0, wet: 0.3 }).start();
     const reverb = new Tone.Freeverb({ roomSize: 0.85, dampening: 3000, wet: 0.15 });
@@ -127,10 +168,8 @@
     const zipBtn = document.getElementById('zipBtn');
     const folderSaveBtn = document.getElementById('folderSaveBtn');
 
-    // 检查浏览器是否支持直接保存到文件夹
     if (!('showDirectoryPicker' in window)) {
-        folderSaveBtn.title = "您的浏览器不支持此功能，请使用 Chrome 或 Edge";
-        folderSaveBtn.style.opacity = "0.5";
+        folderSaveBtn.title = "浏览器不支持直接写入文件夹";
     }
 
     const handleFiles = async (files) => {
@@ -157,7 +196,7 @@
         playBtn.innerText = "⏳ 加载中...";
         await Tone.loaded();
         playBtn.disabled = false;
-        playBtn.innerText = "▶️ 试听首个";
+        playBtn.innerText = "▶ 试听首个 (Play)";
     };
 
     document.getElementById('folderUpload').addEventListener('change', (e) => handleFiles(e.target.files));
@@ -168,19 +207,16 @@
             <tr>
                 <td class="file-name" title="${item.file.name}">${item.file.name}</td>
                 <td id="status-${index}" class="status-${item.status}">${getStatusText(item.status)}</td>
-                <td id="action-${index}">
-                    ${item.status === 'done' ? `<a href="${item.url}" download="Stereo_${item.name}.wav" class="btn-download">💾 单独下载</a>` : '-'}
-                </td>
             </tr>
         `).join('');
     }
 
     function getStatusText(status) {
         switch(status) {
-            case 'wait': return '⏳ 等待中';
-            case 'processing': return '🔄 处理中...';
-            case 'done': return '✅ 完成';
-            case 'error': return '❌ 失败';
+            case 'wait': return 'Wait';
+            case 'processing': return 'Processing...';
+            case 'done': return 'Done';
+            case 'error': return 'Error';
             default: return '';
         }
     }
@@ -188,29 +224,33 @@
     function updateQueueItemUI(index) {
         const item = fileQueue[index];
         const statusTd = document.getElementById(`status-${index}`);
-        const actionTd = document.getElementById(`action-${index}`);
         statusTd.className = `status-${item.status}`;
         statusTd.innerText = getStatusText(item.status);
-        if (item.status === 'done') {
-            actionTd.innerHTML = `<a href="${item.url}" download="Stereo_${item.name}.wav" class="btn-download">💾 单独下载</a>`;
-        }
     }
 
     playBtn.addEventListener('click', async () => {
         await Tone.start();
-        if (isPlaying) { player.stop(); playBtn.innerText = "▶️ 试听首个"; } 
-        else { player.start(); playBtn.innerText = "⏸️ 暂停"; }
+        if (isPlaying) { player.stop(); playBtn.innerText = "▶ 试听 (Play)"; } 
+        else { player.start(); playBtn.innerText = "⏸ 暂停 (Pause)"; }
         isPlaying = !isPlaying;
     });
 
+    // 高精度参数绑定
     const bindSlider = (id, effectNode, paramKey) => {
         const slider = document.getElementById(id);
         const display = document.getElementById(`${id}-val`);
         slider.addEventListener('input', (e) => {
-            const val = parseFloat(e.target.value);
-            display.innerText = val;
+            let val = parseFloat(e.target.value);
+            // 格式化数值显示，保持与达芬奇类似的代码感
+            if(id === 'room' || id === 'wet' || id === 'chorus') {
+                display.innerText = val.toFixed(2);
+            } else {
+                display.innerText = val;
+            }
+
             if (paramKey === 'frequency') effectNode.frequency.value = val;
             else if (paramKey === 'roomSize') effectNode.roomSize.value = val;
+            else if (paramKey === 'dampening') effectNode.dampening.value = val;
             else effectNode[paramKey].value = val;
         });
     };
@@ -218,14 +258,14 @@
     bindSlider('cutoff', filter, 'frequency');
     bindSlider('chorus', chorus, 'wet');
     bindSlider('room', reverb, 'roomSize');
+    bindSlider('brightness', reverb, 'dampening'); // 将明亮度映射为 dampening
     bindSlider('wet', reverb, 'wet');
 
-    // --- 核心逻辑 3：批量渲染 ---
     batchExportBtn.addEventListener('click', async () => {
         if (fileQueue.length === 0) return;
         
         batchExportBtn.disabled = true;
-        batchExportBtn.innerText = "🚀 正在处理...";
+        batchExportBtn.innerText = "⏳ Rendering...";
         playBtn.disabled = true; 
         zipBtn.disabled = true; 
         folderSaveBtn.disabled = true;
@@ -242,16 +282,18 @@
             try {
                 const arrayBuffer = await item.file.arrayBuffer();
                 const audioBuffer = await decodeCtx.decodeAudioData(arrayBuffer);
+                
                 const currentCutoff = filter.frequency.value;
                 const currentChorusWet = chorus.wet.value;
                 const currentRoom = reverb.roomSize.value;
+                const currentBright = reverb.dampening.value;
                 const currentReverbWet = reverb.wet.value;
 
                 const renderedBuffer = await Tone.Offline(() => {
                     const offPlayer = new Tone.Player(audioBuffer);
                     const offFilter = new Tone.Filter({ type: "highpass", frequency: currentCutoff });
                     const offChorus = new Tone.Chorus({ rate: 0.5, delayTime: 8, depth: 0.15, feedback: 0, wet: currentChorusWet }).start();
-                    const offReverb = new Tone.Freeverb({ roomSize: currentRoom, dampening: 3000, wet: currentReverbWet });
+                    const offReverb = new Tone.Freeverb({ roomSize: currentRoom, dampening: currentBright, wet: currentReverbWet });
                     
                     offPlayer.chain(offFilter, offChorus, offReverb);
                     offReverb.toDestination();
@@ -270,7 +312,7 @@
             updateQueueItemUI(i);
         }
 
-        batchExportBtn.innerText = "✅ 处理完成！";
+        batchExportBtn.innerText = "✅ Render Complete";
         playBtn.disabled = false;
         
         const hasDoneFiles = fileQueue.some(item => item.status === 'done');
@@ -280,16 +322,15 @@
         }
         
         setTimeout(() => {
-            batchExportBtn.innerText = "🚀 再次生成";
+            batchExportBtn.innerText = "🚀 批量渲染 (Render)";
             batchExportBtn.disabled = false;
         }, 3000);
     });
 
-    // --- 核心逻辑 4：打包 ZIP ---
     zipBtn.addEventListener('click', async () => {
         zipBtn.disabled = true;
         const originalText = zipBtn.innerText;
-        zipBtn.innerText = "⏳ 打包中...";
+        zipBtn.innerText = "⏳ Zipping...";
         try {
             const zip = new JSZip();
             let count = 0;
@@ -302,7 +343,7 @@
             const content = await zip.generateAsync({ type: "blob" });
             const url = URL.createObjectURL(content);
             const anchor = document.createElement('a');
-            anchor.download = `Stereo_Audio_Batch_${count}files.zip`;
+            anchor.download = `Fairlight_Batch_${count}.zip`;
             anchor.href = url;
             anchor.click();
             URL.revokeObjectURL(url);
@@ -314,51 +355,31 @@
         }
     });
 
-    // --- 核心逻辑 5：直接写入本地文件夹 (超强黑科技) ---
     folderSaveBtn.addEventListener('click', async () => {
-        if (!('showDirectoryPicker' in window)) {
-            alert("抱歉，您的浏览器不支持直接写入文件夹功能。请使用最新版 Chrome 或 Edge 浏览器。");
-            return;
-        }
-
+        if (!('showDirectoryPicker' in window)) return;
         try {
-            // 弹出原生的文件夹选择框
-            const dirHandle = await window.showDirectoryPicker({
-                mode: 'readwrite' // 请求读写权限
-            });
-
+            const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
             folderSaveBtn.disabled = true;
             const originalText = folderSaveBtn.innerText;
-            folderSaveBtn.innerText = "⏳ 正在写入...";
+            folderSaveBtn.innerText = "⏳ Writing...";
 
-            let count = 0;
-
-            // 遍历并直接写入本地磁盘
             for (const item of fileQueue) {
                 if (item.status === 'done' && item.blob) {
                     const fileHandle = await dirHandle.getFileHandle(`Stereo_${item.name}.wav`, { create: true });
                     const writable = await fileHandle.createWritable();
                     await writable.write(item.blob);
                     await writable.close();
-                    count++;
                 }
             }
-
-            alert(`🎉 大功告成！\n成功将 ${count} 个音频直接保存到了您选择的文件夹中，快去看看吧！`);
-
+            alert(`🎉 输出完成！(Render completed successfully)`);
             folderSaveBtn.innerText = originalText;
             folderSaveBtn.disabled = false;
-
         } catch (error) {
-            if (error.name !== 'AbortError') { // 忽略用户主动取消
-                console.error("保存失败:", error);
-                alert("保存失败，请检查是否授予了浏览器的读写权限！");
-            }
+            if (error.name !== 'AbortError') alert("保存失败，请检查权限！");
             folderSaveBtn.disabled = false;
         }
     });
 
-    // --- 辅助函数：AudioBuffer 转 WAV ---
     function bufferToWave(abuffer, len) {
         let numOfChan = abuffer.numberOfChannels, length = len * numOfChan * 2 + 44;
         let buffer = new ArrayBuffer(length), view = new DataView(buffer), channels = [], i, sample, offset = 0, pos = 0;
