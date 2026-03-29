@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>音频空间生成器 - 达芬奇专业版</title>
+    <title>音频空间生成器 - Cathedral 级</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
@@ -28,13 +28,13 @@
         .status-done { color: #4CAF50; }
         .status-error { color: #f44336; }
         
-        /* 专业控制面板样式 (致敬 DaVinci) */
+        /* 专业控制面板样式 */
         .control-group { padding: 15px 0; border-top: 1px solid #333; }
         .panel-title { color: #fff; font-size: 13px; margin-bottom: 15px; display: flex; align-items: center; }
         .panel-title::before { content: ''; display: inline-block; width: 8px; height: 8px; background: #f44336; border-radius: 50%; margin-right: 8px; box-shadow: 0 0 5px #f44336; }
         
         .slider-row { display: flex; align-items: center; margin-bottom: 12px; justify-content: space-between;}
-        label { width: 140px; font-size: 12px; color: #aaa; text-align: right; padding-right: 15px; }
+        label { width: 150px; font-size: 12px; color: #aaa; text-align: right; padding-right: 15px; }
         input[type="range"] { 
             flex-grow: 1; 
             -webkit-appearance: none; 
@@ -54,7 +54,7 @@
         input[type="range"]::-webkit-slider-thumb:hover { background: #fff; transform: scale(1.2);}
         
         .value-box { 
-            width: 50px; 
+            width: 55px; 
             background: #111; 
             border: 1px solid #333; 
             color: #ddd; 
@@ -65,6 +65,8 @@
             margin-left: 15px;
             font-family: monospace;
         }
+
+        .unit { font-size: 10px; color: #666; margin-left: 2px;}
 
         /* 按钮组 */
         .btn-group { display: flex; gap: 10px; margin-top: 20px; border-top: 1px solid #333; padding-top: 20px;}
@@ -84,7 +86,7 @@
 <body>
 
 <div class="container">
-    <h2>Fairlight Audio Web Processor</h2>
+    <h2>Fairlight Audio - Cathedral Preset</h2>
     
     <div class="upload-buttons">
         <label class="upload-label">
@@ -110,36 +112,36 @@
     </div>
 
     <div class="control-group">
-        <div class="panel-title">Reverb & Space (空间混响参数)</div>
+        <div class="panel-title">混响与空间重构链路 (Reverb Chain)</div>
         
         <div class="slider-row">
-            <label>房间大小 (Room Size)</label>
-            <input type="range" id="room" min="0" max="1" step="0.01" value="0.85">
-            <div class="value-box" id="room-val">0.85</div>
+            <label>预延迟 (Pre-delay)</label>
+            <input type="range" id="preDelay" min="0" max="200" step="1" value="42">
+            <div class="value-box"><span id="preDelay-val">42</span><span class="unit">ms</span></div>
         </div>
         
         <div class="slider-row">
-            <label>明亮度 (Brightness)</label>
-            <input type="range" id="brightness" min="1000" max="10000" step="100" value="3000">
-            <div class="value-box" id="brightness-val">3000</div>
+            <label>混响尺寸 (Room Size)</label>
+            <input type="range" id="room" min="0" max="0.99" step="0.01" value="0.95">
+            <div class="value-box"><span id="room-val">0.95</span><span class="unit"></span></div>
         </div>
 
         <div class="slider-row">
-            <label>干/湿比例 (Dry / Wet)</label>
-            <input type="range" id="wet" min="0" max="1" step="0.01" value="0.15">
-            <div class="value-box" id="wet-val">0.15</div>
+            <label>早期反射低切 (Low Cut)</label>
+            <input type="range" id="lowCut" min="20" max="1000" step="10" value="300">
+            <div class="value-box"><span id="lowCut-val">300</span><span class="unit">Hz</span></div>
+        </div>
+
+        <div class="slider-row">
+            <label>早期反射高切 (High Cut)</label>
+            <input type="range" id="highCut" min="5000" max="20000" step="100" value="10000">
+            <div class="value-box"><span id="highCut-val">10000</span><span class="unit">Hz</span></div>
         </div>
 
         <div class="slider-row" style="margin-top: 25px;">
-            <label>早期反射增强 (Chorus)</label>
-            <input type="range" id="chorus" min="0" max="1" step="0.01" value="0.30">
-            <div class="value-box" id="chorus-val">0.30</div>
-        </div>
-
-        <div class="slider-row">
-            <label>低切频率 (Low Cut)</label>
-            <input type="range" id="cutoff" min="20" max="1000" step="1" value="150">
-            <div class="value-box" id="cutoff-val">150</div>
+            <label>干/湿比例 (Dry/Wet)</label>
+            <input type="range" id="wet" min="0" max="1" step="0.01" value="0.40">
+            <div class="value-box"><span id="wet-val">0.40</span><span class="unit"></span></div>
         </div>
     </div>
 
@@ -152,11 +154,27 @@
 </div>
 
 <script>
-    // 效果器核心
-    const filter = new Tone.Filter({ type: "highpass", frequency: 150 });
-    const chorus = new Tone.Chorus({ rate: 0.5, delayTime: 8, depth: 0.15, feedback: 0, wet: 0.3 }).start();
-    const reverb = new Tone.Freeverb({ roomSize: 0.85, dampening: 3000, wet: 0.15 });
+    // --- 构建“达芬奇”效果器链路 ---
+    // 1. 预延迟 (Pre-delay)
+    const preDelayNode = new Tone.Delay(0.042); // 42ms
     
+    // 2. 空间混响主体 (使用接近 1 的 roomSize 模拟 Cathedral 的长尾音)
+    const reverbNode = new Tone.Freeverb({ roomSize: 0.95, dampening: 8000 });
+    
+    // 3. EQ 滤波 (模拟达芬奇的低切和高切)
+    const lowCutFilter = new Tone.Filter({ type: "highpass", frequency: 300 });
+    const highCutFilter = new Tone.Filter({ type: "lowpass", frequency: 10000 });
+    
+    // 4. 干湿比控制 (CrossFade)
+    const crossFade = new Tone.CrossFade(0.40); // 初始 wet 值为 0.40
+
+    // 将这些节点固定连接好
+    // 湿声路径：Delay -> EQ -> Reverb -> CrossFade(B通道)
+    preDelayNode.chain(lowCutFilter, highCutFilter, reverbNode, crossFade.b);
+    
+    // 输出到全局扬声器
+    crossFade.toDestination();
+
     let player = null;
     let isPlaying = false;
     let fileQueue = []; 
@@ -190,8 +208,10 @@
         const previewUrl = URL.createObjectURL(fileQueue[0].file);
         
         player = new Tone.Player(previewUrl);
-        player.chain(filter, chorus, reverb);
-        reverb.toDestination(); 
+        
+        // 音源分两路：一路直接去 A 通道(干声)，一路去预延迟节点(湿声路径起点)
+        player.connect(crossFade.a);
+        player.connect(preDelayNode);
         
         playBtn.innerText = "⏳ 加载中...";
         await Tone.loaded();
@@ -235,31 +255,25 @@
         isPlaying = !isPlaying;
     });
 
-    // 高精度参数绑定
-    const bindSlider = (id, effectNode, paramKey) => {
+    // 参数绑定
+    const bindSlider = (id, callback) => {
         const slider = document.getElementById(id);
         const display = document.getElementById(`${id}-val`);
         slider.addEventListener('input', (e) => {
             let val = parseFloat(e.target.value);
-            // 格式化数值显示，保持与达芬奇类似的代码感
-            if(id === 'room' || id === 'wet' || id === 'chorus') {
-                display.innerText = val.toFixed(2);
-            } else {
-                display.innerText = val;
-            }
-
-            if (paramKey === 'frequency') effectNode.frequency.value = val;
-            else if (paramKey === 'roomSize') effectNode.roomSize.value = val;
-            else if (paramKey === 'dampening') effectNode.dampening.value = val;
-            else effectNode[paramKey].value = val;
+            // 格式化数值显示
+            if(id === 'room' || id === 'wet') display.innerText = val.toFixed(2);
+            else display.innerText = val;
+            
+            callback(val);
         });
     };
 
-    bindSlider('cutoff', filter, 'frequency');
-    bindSlider('chorus', chorus, 'wet');
-    bindSlider('room', reverb, 'roomSize');
-    bindSlider('brightness', reverb, 'dampening'); // 将明亮度映射为 dampening
-    bindSlider('wet', reverb, 'wet');
+    bindSlider('preDelay', (val) => { preDelayNode.delayTime.value = val / 1000; }); // 毫秒转秒
+    bindSlider('room', (val) => { reverbNode.roomSize.value = val; });
+    bindSlider('lowCut', (val) => { lowCutFilter.frequency.value = val; });
+    bindSlider('highCut', (val) => { highCutFilter.frequency.value = val; });
+    bindSlider('wet', (val) => { crossFade.fade.value = val; });
 
     batchExportBtn.addEventListener('click', async () => {
         if (fileQueue.length === 0) return;
@@ -283,22 +297,32 @@
                 const arrayBuffer = await item.file.arrayBuffer();
                 const audioBuffer = await decodeCtx.decodeAudioData(arrayBuffer);
                 
-                const currentCutoff = filter.frequency.value;
-                const currentChorusWet = chorus.wet.value;
-                const currentRoom = reverb.roomSize.value;
-                const currentBright = reverb.dampening.value;
-                const currentReverbWet = reverb.wet.value;
+                // 获取当前参数
+                const currentPreDelay = preDelayNode.delayTime.value;
+                const currentRoom = reverbNode.roomSize.value;
+                const currentLowCut = lowCutFilter.frequency.value;
+                const currentHighCut = highCutFilter.frequency.value;
+                const currentWet = crossFade.fade.value;
 
-                const renderedBuffer = await Tone.Offline(() => {
+                // 重点：在后台重新构建完整的链路
+                const renderedBuffer = await Tone.Offline(({ context }) => {
                     const offPlayer = new Tone.Player(audioBuffer);
-                    const offFilter = new Tone.Filter({ type: "highpass", frequency: currentCutoff });
-                    const offChorus = new Tone.Chorus({ rate: 0.5, delayTime: 8, depth: 0.15, feedback: 0, wet: currentChorusWet }).start();
-                    const offReverb = new Tone.Freeverb({ roomSize: currentRoom, dampening: currentBright, wet: currentReverbWet });
                     
-                    offPlayer.chain(offFilter, offChorus, offReverb);
-                    offReverb.toDestination();
+                    const offPreDelay = new Tone.Delay(currentPreDelay);
+                    const offReverb = new Tone.Freeverb({ roomSize: currentRoom, dampening: 8000 });
+                    const offLowCut = new Tone.Filter({ type: "highpass", frequency: currentLowCut });
+                    const offHighCut = new Tone.Filter({ type: "lowpass", frequency: currentHighCut });
+                    const offCrossFade = new Tone.CrossFade(currentWet);
+
+                    // 重新连线
+                    offPreDelay.chain(offLowCut, offHighCut, offReverb, offCrossFade.b);
+                    offPlayer.connect(offCrossFade.a);
+                    offPlayer.connect(offPreDelay);
+                    
+                    offCrossFade.connect(context.destination);
+                    
                     offPlayer.start(0);
-                }, audioBuffer.duration);
+                }, audioBuffer.duration + 3.0); // 增加3秒的渲染时间，防止大教堂的尾音被切断！
 
                 const wavBlob = bufferToWave(renderedBuffer.get(), renderedBuffer.length);
                 item.blob = wavBlob;
@@ -336,14 +360,14 @@
             let count = 0;
             fileQueue.forEach(item => {
                 if (item.status === 'done' && item.blob) {
-                    zip.file(`Stereo_${item.name}.wav`, item.blob);
+                    zip.file(`Cathedral_${item.name}.wav`, item.blob);
                     count++;
                 }
             });
             const content = await zip.generateAsync({ type: "blob" });
             const url = URL.createObjectURL(content);
             const anchor = document.createElement('a');
-            anchor.download = `Fairlight_Batch_${count}.zip`;
+            anchor.download = `Fairlight_Cathedral_Batch_${count}.zip`;
             anchor.href = url;
             anchor.click();
             URL.revokeObjectURL(url);
@@ -365,7 +389,7 @@
 
             for (const item of fileQueue) {
                 if (item.status === 'done' && item.blob) {
-                    const fileHandle = await dirHandle.getFileHandle(`Stereo_${item.name}.wav`, { create: true });
+                    const fileHandle = await dirHandle.getFileHandle(`Cathedral_${item.name}.wav`, { create: true });
                     const writable = await fileHandle.createWritable();
                     await writable.write(item.blob);
                     await writable.close();
