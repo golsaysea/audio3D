@@ -28,11 +28,13 @@
         .status-done { color: #4CAF50; font-weight: bold;}
         .status-error { color: #f44336; font-weight: bold;}
         
-        /* 单独下载按钮样式 - 区分 WAV 和 MP4 */
+        /* 单独下载按钮样式 - 区分 WAV, MP3 和 MP4 */
         .action-cell { display: flex; gap: 6px; }
         .btn-download { background: #5c8a6b; color: white; padding: 5px 8px; border-radius: 4px; text-decoration: none; font-size: 11px; display: inline-block; transition: 0.2s; white-space: nowrap;}
         .btn-download:hover { background: #4a7357; }
-        .btn-download-mp4 { background: #4a789c; } /* 给 MP4 一个特别的蓝色区分一下 */
+        .btn-download-mp3 { background: #e67e22; } /* 橙色 MP3 */
+        .btn-download-mp3:hover { background: #d35400; }
+        .btn-download-mp4 { background: #4a789c; } /* 蓝色 MP4 */
         .btn-download-mp4:hover { background: #3b6382; }
         
         /* 专业控制面板样式 */
@@ -168,7 +170,6 @@
     // --- 1. 配置加载与本地存储逻辑 (LocalStorage) ---
     const STORAGE_KEY = 'fairlight_custom_preset_v2';
     
-    // 【专属出厂默认预设】完全匹配你的截图设定
     const defaultSettings = {
         preDelay: 40,
         room: 0.40,      
@@ -287,7 +288,7 @@
         }
     }
 
-    // 【新增功能】当状态变更为 done 时，生成两个下载按钮（WAV 和 MP4）
+    // 更新表格行：生成 WAV, MP3, MP4 按钮
     function updateQueueItemUI(index) {
         const item = fileQueue[index];
         const statusTd = document.getElementById(`status-${index}`);
@@ -297,11 +298,11 @@
         statusTd.innerText = getStatusText(item.status);
         
         if (item.status === 'done') {
-            // 同一个资源链接 item.url，只要更改 download 属性的后缀，浏览器保存时就会自动改名
             actionTd.innerHTML = `
                 <div class="action-cell">
-                    <a href="${item.url}" download="Reverb_${item.name}.wav" class="btn-download" title="标准音频格式">💾 WAV</a>
-                    <a href="${item.url}" download="Reverb_${item.name}.mp4" class="btn-download btn-download-mp4" title="强行改后缀供 Canva 导入">🎬 MP4</a>
+                    <a href="${item.url}" download="Reverb_${item.name}.wav" class="btn-download" title="标准音频">💾 WAV</a>
+                    <a href="${item.url}" download="Reverb_${item.name}.mp3" class="btn-download btn-download-mp3" title="改名MP3">🎵 MP3</a>
+                    <a href="${item.url}" download="Reverb_${item.name}.mp4" class="btn-download btn-download-mp4" title="改名MP4供Canva用">🎬 MP4</a>
                 </div>
             `;
         } else {
@@ -376,7 +377,7 @@
                     offPlayer.connect(offCrossFade.a);
                     offPlayer.connect(offPreDelay);
                     
-                    offCrossFade.toDestination(); // 退回已被验证能完美渲染的底层连线逻辑
+                    offCrossFade.toDestination();
                     
                     offPlayer.start(0);
                 }, audioBuffer.duration + 3.0); 
@@ -408,6 +409,7 @@
         }, 3000);
     });
 
+    // ZIP 打包逻辑：同时将三种格式全塞进去
     zipBtn.addEventListener('click', async () => {
         zipBtn.disabled = true;
         const originalText = zipBtn.innerText;
@@ -418,6 +420,8 @@
             fileQueue.forEach(item => {
                 if (item.status === 'done' && item.blob) {
                     zip.file(`Reverb_${item.name}.wav`, item.blob);
+                    zip.file(`Reverb_${item.name}.mp3`, item.blob); // 顺便包一个 MP3
+                    zip.file(`Reverb_${item.name}.mp4`, item.blob); // 顺便包一个 MP4
                     count++;
                 }
             });
@@ -436,6 +440,7 @@
         }
     });
 
+    // 直接输出到目录逻辑：同时写入三种格式的文件
     folderSaveBtn.addEventListener('click', async () => {
         if (!('showDirectoryPicker' in window)) return;
         try {
@@ -446,13 +451,26 @@
 
             for (const item of fileQueue) {
                 if (item.status === 'done' && item.blob) {
-                    const fileHandle = await dirHandle.getFileHandle(`Reverb_${item.name}.wav`, { create: true });
-                    const writable = await fileHandle.createWritable();
-                    await writable.write(item.blob);
-                    await writable.close();
+                    // 写 WAV
+                    const fileHandleWav = await dirHandle.getFileHandle(`Reverb_${item.name}.wav`, { create: true });
+                    const writableWav = await fileHandleWav.createWritable();
+                    await writableWav.write(item.blob);
+                    await writableWav.close();
+
+                    // 写 MP3
+                    const fileHandleMp3 = await dirHandle.getFileHandle(`Reverb_${item.name}.mp3`, { create: true });
+                    const writableMp3 = await fileHandleMp3.createWritable();
+                    await writableMp3.write(item.blob);
+                    await writableMp3.close();
+
+                    // 写 MP4
+                    const fileHandleMp4 = await dirHandle.getFileHandle(`Reverb_${item.name}.mp4`, { create: true });
+                    const writableMp4 = await fileHandleMp4.createWritable();
+                    await writableMp4.write(item.blob);
+                    await writableMp4.close();
                 }
             }
-            alert(`🎉 输出完成！成功保存到本地文件夹。`);
+            alert(`🎉 输出完成！每份音频已同时保存为 .wav, .mp3, .mp4 格式到您的文件夹。`);
             folderSaveBtn.innerText = originalText;
             folderSaveBtn.disabled = false;
         } catch (error) {
