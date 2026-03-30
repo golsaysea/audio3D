@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>音频空间生成器 - 达芬奇大教堂护眼版</title>
+    <title>音频空间生成器 - 护眼定制版</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         /* 经典护眼豆沙绿主题 */
         body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; background-color: #C7EDCC; display: flex; justify-content: center; padding-top: 30px; padding-bottom: 50px; color: #2e3b32; margin: 0;}
-        .container { background: #f4faf6; padding: 25px 35px; border-radius: 12px; box-shadow: 0 8px 25px rgba(0, 100, 50, 0.08); width: 600px; border: 1px solid #a8c9b3; }
+        .container { background: #f4faf6; padding: 25px 35px; border-radius: 12px; box-shadow: 0 8px 25px rgba(0, 100, 50, 0.08); width: 650px; border: 1px solid #a8c9b3; }
         h2 { margin-top: 0; color: #1a2b22; text-align: center; font-weight: 600; font-size: 20px; border-bottom: 2px solid #d0e5d8; padding-bottom: 15px;}
         
         /* 文件上传区 */
@@ -27,6 +27,8 @@
         .status-processing { color: #00bcd4; font-weight: bold;}
         .status-done { color: #4CAF50; font-weight: bold;}
         .status-error { color: #f44336; font-weight: bold;}
+        .btn-download { background: #5c8a6b; color: white; padding: 5px 10px; border-radius: 4px; text-decoration: none; font-size: 12px; display: inline-block; transition: 0.2s;}
+        .btn-download:hover { background: #4a7357; }
         
         /* 专业控制面板样式 */
         .control-group { padding: 15px 0; border-top: 1px solid #d0e5d8; }
@@ -108,7 +110,7 @@
                 <tr>
                     <th>文件名 (File Name)</th>
                     <th>状态 (Status)</th>
-                </tr>
+                    <th>操作 (Action)</th> </tr>
             </thead>
             <tbody id="queueBody"></tbody>
         </table>
@@ -119,14 +121,14 @@
         
         <div class="slider-row">
             <label>预延迟 (Pre-delay)</label>
-            <input type="range" id="preDelay" min="0" max="200" step="1" value="42">
-            <div class="value-box"><span id="preDelay-val">42</span><span class="unit">ms</span></div>
+            <input type="range" id="preDelay" min="0" max="200" step="1" value="40">
+            <div class="value-box"><span id="preDelay-val">40</span><span class="unit">ms</span></div>
         </div>
         
         <div class="slider-row">
             <label>混响尺寸 (Room Size)</label>
-            <input type="range" id="room" min="0" max="0.99" step="0.01" value="0.95">
-            <div class="value-box"><span id="room-val">0.95</span><span class="unit"></span></div>
+            <input type="range" id="room" min="0" max="0.99" step="0.01" value="0.40">
+            <div class="value-box"><span id="room-val">0.40</span><span class="unit"></span></div>
         </div>
 
         <div class="slider-row">
@@ -143,8 +145,8 @@
 
         <div class="slider-row" style="margin-top: 25px;">
             <label>干/湿比例 (Dry/Wet)</label>
-            <input type="range" id="wet" min="0" max="1" step="0.01" value="0.40">
-            <div class="value-box"><span id="wet-val">0.40</span><span class="unit"></span></div>
+            <input type="range" id="wet" min="0" max="1" step="0.01" value="0.10">
+            <div class="value-box"><span id="wet-val">0.10</span><span class="unit"></span></div>
         </div>
     </div>
 
@@ -158,17 +160,18 @@
 
 <script>
     // --- 1. 配置加载与本地存储逻辑 (LocalStorage) ---
-    // 更改了 Storage Key，强制重新读取达芬奇大教堂版本的默认值，防止被之前 0.4 的缓存污染
-    const STORAGE_KEY = 'fairlight_cathedral_green_v2';
+    // 修改了存储名称，强制浏览器读取你这套最新的完美预设
+    const STORAGE_KEY = 'fairlight_custom_preset_v1';
+    
+    // 【专属出厂默认预设】完全匹配你截图里的设定
     const defaultSettings = {
-        preDelay: 42,
-        room: 0.95,      // 恢复原汁原味的达芬奇大教堂 0.95 尺寸
+        preDelay: 40,
+        room: 0.40,      
         lowCut: 300,
         highCut: 10000,
-        wet: 0.40
+        wet: 0.10
     };
 
-    // 读取本地缓存
     function loadSettings() {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
@@ -180,7 +183,6 @@
 
     const settings = loadSettings();
 
-    // 自动保存当前滑块的值
     function saveSettings() {
         const currentSettings = {
             preDelay: parseFloat(document.getElementById('preDelay').value),
@@ -192,14 +194,13 @@
         localStorage.setItem(STORAGE_KEY, JSON.stringify(currentSettings));
     }
 
-    // --- 2. 构建达芬奇大教堂音频链路 ---
+    // --- 2. 构建核心音频链路 ---
     const preDelayNode = new Tone.Delay(settings.preDelay / 1000); 
     const reverbNode = new Tone.Freeverb({ roomSize: settings.room, dampening: 8000 });
     const lowCutFilter = new Tone.Filter({ type: "highpass", frequency: settings.lowCut });
     const highCutFilter = new Tone.Filter({ type: "lowpass", frequency: settings.highCut });
     const crossFade = new Tone.CrossFade(settings.wet); 
 
-    // 湿声路径连接
     preDelayNode.chain(lowCutFilter, highCutFilter, reverbNode, crossFade.b);
     crossFade.toDestination();
 
@@ -218,7 +219,6 @@
         folderSaveBtn.title = "浏览器不支持直接写入文件夹";
     }
 
-    // 初始化UI界面
     function initUI() {
         const ids = ['preDelay', 'room', 'lowCut', 'highCut', 'wet'];
         ids.forEach(id => {
@@ -261,11 +261,13 @@
     document.getElementById('folderUpload').addEventListener('change', (e) => handleFiles(e.target.files));
     document.getElementById('fileUpload').addEventListener('change', (e) => handleFiles(e.target.files));
 
+    // 【修复】重新加回单独下载列
     function renderQueueTable() {
         queueBody.innerHTML = fileQueue.map((item, index) => `
             <tr>
                 <td class="file-name" title="${item.file.name}">${item.file.name}</td>
                 <td id="status-${index}" class="status-${item.status}">${getStatusText(item.status)}</td>
+                <td id="action-${index}">-</td>
             </tr>
         `).join('');
     }
@@ -280,11 +282,20 @@
         }
     }
 
+    // 【修复】当状态变更为 done 时，生成单独下载按钮
     function updateQueueItemUI(index) {
         const item = fileQueue[index];
         const statusTd = document.getElementById(`status-${index}`);
+        const actionTd = document.getElementById(`action-${index}`);
+        
         statusTd.className = `status-${item.status}`;
         statusTd.innerText = getStatusText(item.status);
+        
+        if (item.status === 'done') {
+            actionTd.innerHTML = `<a href="${item.url}" download="Reverb_${item.name}.wav" class="btn-download">💾 单独下载</a>`;
+        } else if (item.status === 'error') {
+            actionTd.innerHTML = `-`;
+        }
     }
 
     playBtn.addEventListener('click', async () => {
@@ -294,7 +305,6 @@
         isPlaying = !isPlaying;
     });
 
-    // 参数绑定：滑动时即刻保存
     const bindSlider = (id, callback) => {
         const slider = document.getElementById(id);
         const display = document.getElementById(`${id}-val`);
@@ -355,9 +365,9 @@
                     offPlayer.connect(offCrossFade.a);
                     offPlayer.connect(offPreDelay);
                     
-                    offCrossFade.toDestination(); 
+                    // 【加固防错】强制标准连接物理主输出通道
+                    offCrossFade.connect(Tone.Destination);
                     
-                    // 同样保留了大教堂专属的 + 3.0秒 渲染时长，确保尾音自然衰减
                     offPlayer.start(0);
                 }, audioBuffer.duration + 3.0); 
 
@@ -397,14 +407,14 @@
             let count = 0;
             fileQueue.forEach(item => {
                 if (item.status === 'done' && item.blob) {
-                    zip.file(`Cathedral_${item.name}.wav`, item.blob);
+                    zip.file(`Reverb_${item.name}.wav`, item.blob);
                     count++;
                 }
             });
             const content = await zip.generateAsync({ type: "blob" });
             const url = URL.createObjectURL(content);
             const anchor = document.createElement('a');
-            anchor.download = `Audio_Cathedral_Batch_${count}files.zip`;
+            anchor.download = `Audio_Batch_Processed_${count}files.zip`;
             anchor.href = url;
             anchor.click();
             URL.revokeObjectURL(url);
@@ -426,7 +436,7 @@
 
             for (const item of fileQueue) {
                 if (item.status === 'done' && item.blob) {
-                    const fileHandle = await dirHandle.getFileHandle(`Cathedral_${item.name}.wav`, { create: true });
+                    const fileHandle = await dirHandle.getFileHandle(`Reverb_${item.name}.wav`, { create: true });
                     const writable = await fileHandle.createWritable();
                     await writable.write(item.blob);
                     await writable.close();
