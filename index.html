@@ -3,90 +3,89 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>音频空间生成器 - Cathedral 级</title>
+    <title>音频空间生成器 - 护眼记忆版</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
-        /* 达芬奇暗黑主题风格 */
-        body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; background-color: #121212; display: flex; justify-content: center; padding-top: 30px; padding-bottom: 50px; color: #b0b0b0; }
-        .container { background: #1e1e1e; padding: 25px 35px; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 600px; border: 1px solid #333; }
-        h2 { margin-top: 0; color: #e0e0e0; text-align: center; font-weight: 500; font-size: 20px; border-bottom: 1px solid #333; padding-bottom: 15px;}
+        /* 禅意护眼暗色主题 (低对比度，柔和色调) */
+        body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; background-color: #1e211f; display: flex; justify-content: center; padding-top: 30px; padding-bottom: 50px; color: #a9b5ac; }
+        .container { background: #262a27; padding: 25px 35px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.4); width: 600px; border: 1px solid #363b37; }
+        h2 { margin-top: 0; color: #d0d8d1; text-align: center; font-weight: 500; font-size: 20px; border-bottom: 1px solid #363b37; padding-bottom: 15px;}
         
         /* 文件上传区 */
         .upload-buttons { display: flex; gap: 10px; margin-top: 10px; margin-bottom: 20px;}
-        .upload-label { flex: 1; text-align: center; background: #2a2a2a; color: #aaa; border: 1px dashed #555; padding: 12px; border-radius: 4px; cursor: pointer; transition: 0.2s; font-size: 13px; }
-        .upload-label:hover { background: #333; color: #fff; border-color: #777;}
+        .upload-label { flex: 1; text-align: center; background: #2f3430; color: #9da89f; border: 1px dashed #4a524c; padding: 12px; border-radius: 6px; cursor: pointer; transition: 0.2s; font-size: 13px; }
+        .upload-label:hover { background: #383e39; color: #c4cdc5; border-color: #6a9955;}
         
         /* 队列区域 */
-        .queue-container { max-height: 200px; overflow-y: auto; border: 1px solid #333; border-radius: 4px; margin-bottom: 20px; display: none; background: #1a1a1a; }
+        .queue-container { max-height: 200px; overflow-y: auto; border: 1px solid #363b37; border-radius: 6px; margin-bottom: 20px; display: none; background: #1c1e1d; }
         table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; }
-        th, td { padding: 8px 12px; border-bottom: 1px solid #2a2a2a; }
-        th { background: #252525; position: sticky; top: 0; z-index: 1; color: #888; font-weight: normal;}
-        .file-name { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #ddd; }
-        .status-wait { color: #888; }
-        .status-processing { color: #00bcd4; }
-        .status-done { color: #4CAF50; }
-        .status-error { color: #f44336; }
+        th, td { padding: 8px 12px; border-bottom: 1px solid #2f3430; }
+        th { background: #262a27; position: sticky; top: 0; z-index: 1; color: #879189; font-weight: normal;}
+        .file-name { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #c4cdc5; }
+        .status-wait { color: #879189; }
+        .status-processing { color: #4fc1ff; }
+        .status-done { color: #6a9955; }
+        .status-error { color: #f48771; }
         
         /* 专业控制面板样式 */
-        .control-group { padding: 15px 0; border-top: 1px solid #333; }
-        .panel-title { color: #fff; font-size: 13px; margin-bottom: 15px; display: flex; align-items: center; }
-        .panel-title::before { content: ''; display: inline-block; width: 8px; height: 8px; background: #f44336; border-radius: 50%; margin-right: 8px; box-shadow: 0 0 5px #f44336; }
+        .control-group { padding: 15px 0; border-top: 1px solid #363b37; }
+        .panel-title { color: #d0d8d1; font-size: 13px; margin-bottom: 15px; display: flex; align-items: center; }
+        .panel-title::before { content: ''; display: inline-block; width: 8px; height: 8px; background: #6a9955; border-radius: 50%; margin-right: 8px; box-shadow: 0 0 6px rgba(106, 153, 85, 0.6); }
         
         .slider-row { display: flex; align-items: center; margin-bottom: 12px; justify-content: space-between;}
-        label { width: 150px; font-size: 12px; color: #aaa; text-align: right; padding-right: 15px; }
+        label { width: 150px; font-size: 12px; color: #9da89f; text-align: right; padding-right: 15px; }
         input[type="range"] { 
             flex-grow: 1; 
             -webkit-appearance: none; 
-            background: #333; 
+            background: #363b37; 
             height: 4px; 
             border-radius: 2px; 
             outline: none; 
         }
         input[type="range"]::-webkit-slider-thumb { 
             -webkit-appearance: none; 
-            width: 12px; height: 12px; 
-            background: #888; 
+            width: 14px; height: 14px; 
+            background: #8aa682; 
             border-radius: 50%; 
             cursor: pointer; 
             transition: 0.1s;
         }
-        input[type="range"]::-webkit-slider-thumb:hover { background: #fff; transform: scale(1.2);}
+        input[type="range"]::-webkit-slider-thumb:hover { background: #b5cead; transform: scale(1.1);}
         
         .value-box { 
             width: 55px; 
-            background: #111; 
-            border: 1px solid #333; 
-            color: #ddd; 
+            background: #181a19; 
+            border: 1px solid #363b37; 
+            color: #c4cdc5; 
             text-align: center; 
-            padding: 3px 0; 
+            padding: 4px 0; 
             font-size: 12px; 
-            border-radius: 3px; 
+            border-radius: 4px; 
             margin-left: 15px;
-            font-family: monospace;
+            font-family: 'Consolas', monospace;
         }
 
-        .unit { font-size: 10px; color: #666; margin-left: 2px;}
+        .unit { font-size: 10px; color: #6d766f; margin-left: 2px;}
 
-        /* 按钮组 */
-        .btn-group { display: flex; gap: 10px; margin-top: 20px; border-top: 1px solid #333; padding-top: 20px;}
-        .btn { flex: 1; padding: 10px; color: #fff; border: none; border-radius: 4px; font-size: 13px; cursor: pointer; transition: 0.2s; text-align: center; background: #333;}
-        .btn:hover { background: #444; }
-        .btn-play { background: #2e7d32; }
-        .btn-play:hover { background: #388e3c; }
-        .btn-batch { background: #1565c0; }
-        .btn-batch:hover { background: #1976d2; }
-        .btn-zip { background: #6a1b9a; }
-        .btn-zip:hover { background: #7b1fa2; }
-        .btn-folder { background: #c62828; }
-        .btn-folder:hover { background: #d32f2f; }
-        .btn:disabled { background: #222; color: #555; cursor: not-allowed; }
+        /* 按钮组 (低饱和度护眼色) */
+        .btn-group { display: flex; gap: 10px; margin-top: 20px; border-top: 1px solid #363b37; padding-top: 20px;}
+        .btn { flex: 1; padding: 10px; color: #e0e5e1; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; transition: 0.2s; text-align: center; font-weight: 500;}
+        .btn-play { background: #4b6a43; }
+        .btn-play:hover { background: #5a7d51; }
+        .btn-batch { background: #3b5a75; }
+        .btn-batch:hover { background: #4a6d8c; }
+        .btn-zip { background: #624b75; }
+        .btn-zip:hover { background: #765a8c; }
+        .btn-folder { background: #854949; }
+        .btn-folder:hover { background: #a15959; }
+        .btn:disabled { background: #2f3430; color: #6d766f; cursor: not-allowed; opacity: 0.8;}
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>Fairlight Audio - Cathedral Preset</h2>
+    <h2>Fairlight Audio - 护眼记忆版</h2>
     
     <div class="upload-buttons">
         <label class="upload-label">
@@ -122,8 +121,8 @@
         
         <div class="slider-row">
             <label>混响尺寸 (Room Size)</label>
-            <input type="range" id="room" min="0" max="0.99" step="0.01" value="0.95">
-            <div class="value-box"><span id="room-val">0.95</span><span class="unit"></span></div>
+            <input type="range" id="room" min="0" max="0.99" step="0.01" value="0.40">
+            <div class="value-box"><span id="room-val">0.40</span><span class="unit"></span></div>
         </div>
 
         <div class="slider-row">
@@ -154,16 +153,60 @@
 </div>
 
 <script>
-    // --- 构建“达芬奇”效果器链路 ---
-    const preDelayNode = new Tone.Delay(0.042); 
-    const reverbNode = new Tone.Freeverb({ roomSize: 0.95, dampening: 8000 });
-    const lowCutFilter = new Tone.Filter({ type: "highpass", frequency: 300 });
-    const highCutFilter = new Tone.Filter({ type: "lowpass", frequency: 10000 });
-    const crossFade = new Tone.CrossFade(0.40); 
+    // --- 本地参数记忆核心逻辑 ---
+    // 1. 定义出厂默认值 (含你要求的 Room 0.4)
+    const defaultParams = {
+        preDelay: 42,
+        room: 0.40,
+        lowCut: 300,
+        highCut: 10000,
+        wet: 0.40
+    };
+
+    // 2. 读取浏览器缓存，如果没有缓存则使用默认值
+    const savedParams = JSON.parse(localStorage.getItem('myFairlightSettings')) || defaultParams;
+
+    // --- 构建“达芬奇”效果器链路 (直接使用缓存值初始化) ---
+    const preDelayNode = new Tone.Delay(savedParams.preDelay / 1000); 
+    const reverbNode = new Tone.Freeverb({ roomSize: savedParams.room, dampening: 8000 });
+    const lowCutFilter = new Tone.Filter({ type: "highpass", frequency: savedParams.lowCut });
+    const highCutFilter = new Tone.Filter({ type: "lowpass", frequency: savedParams.highCut });
+    const crossFade = new Tone.CrossFade(savedParams.wet); 
 
     // 湿声路径连接
     preDelayNode.chain(lowCutFilter, highCutFilter, reverbNode, crossFade.b);
     crossFade.toDestination();
+
+    // 3. 将缓存值反向同步给网页 UI 滑块和文字
+    function applySavedParamsToUI() {
+        document.getElementById('preDelay').value = savedParams.preDelay;
+        document.getElementById('preDelay-val').innerText = savedParams.preDelay;
+        
+        document.getElementById('room').value = savedParams.room;
+        document.getElementById('room-val').innerText = savedParams.room.toFixed(2);
+        
+        document.getElementById('lowCut').value = savedParams.lowCut;
+        document.getElementById('lowCut-val').innerText = savedParams.lowCut;
+        
+        document.getElementById('highCut').value = savedParams.highCut;
+        document.getElementById('highCut-val').innerText = savedParams.highCut;
+        
+        document.getElementById('wet').value = savedParams.wet;
+        document.getElementById('wet-val').innerText = savedParams.wet.toFixed(2);
+    }
+    applySavedParamsToUI(); // 页面一加载就执行
+
+    // 4. 保存当前参数到缓存的函数
+    function saveCurrentParams() {
+        const currentParams = {
+            preDelay: parseFloat(document.getElementById('preDelay').value),
+            room: parseFloat(document.getElementById('room').value),
+            lowCut: parseFloat(document.getElementById('lowCut').value),
+            highCut: parseFloat(document.getElementById('highCut').value),
+            wet: parseFloat(document.getElementById('wet').value)
+        };
+        localStorage.setItem('myFairlightSettings', JSON.stringify(currentParams));
+    }
 
     let player = null;
     let isPlaying = false;
@@ -250,7 +293,9 @@
             let val = parseFloat(e.target.value);
             if(id === 'room' || id === 'wet') display.innerText = val.toFixed(2);
             else display.innerText = val;
+            
             callback(val);
+            saveCurrentParams(); // 每次拖动滑块，自动存入浏览器缓存
         });
     };
 
@@ -288,7 +333,6 @@
                 const currentHighCut = highCutFilter.frequency.value;
                 const currentWet = crossFade.fade.value;
 
-                // 修复：使用 () => 代替 ({ context }) =>，并使用 toDestination()
                 const renderedBuffer = await Tone.Offline(() => {
                     const offPlayer = new Tone.Player(audioBuffer);
                     
@@ -302,7 +346,6 @@
                     offPlayer.connect(offCrossFade.a);
                     offPlayer.connect(offPreDelay);
                     
-                    // 修复的核心位置在这里：
                     offCrossFade.toDestination(); 
                     
                     offPlayer.start(0);
@@ -351,7 +394,7 @@
             const content = await zip.generateAsync({ type: "blob" });
             const url = URL.createObjectURL(content);
             const anchor = document.createElement('a');
-            anchor.download = `Fairlight_Cathedral_Batch_${count}.zip`;
+            anchor.download = `Fairlight_Batch_Output.zip`;
             anchor.href = url;
             anchor.click();
             URL.revokeObjectURL(url);
@@ -379,7 +422,7 @@
                     await writable.close();
                 }
             }
-            alert(`🎉 输出完成！(Render completed successfully)`);
+            alert(`🎉 输出完成！`);
             folderSaveBtn.innerText = originalText;
             folderSaveBtn.disabled = false;
         } catch (error) {
