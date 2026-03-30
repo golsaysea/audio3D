@@ -27,6 +27,8 @@
         .status-processing { color: #00bcd4; font-weight: bold;}
         .status-done { color: #4CAF50; font-weight: bold;}
         .status-error { color: #f44336; font-weight: bold;}
+        
+        /* 单独下载按钮样式 */
         .btn-download { background: #5c8a6b; color: white; padding: 5px 10px; border-radius: 4px; text-decoration: none; font-size: 12px; display: inline-block; transition: 0.2s;}
         .btn-download:hover { background: #4a7357; }
         
@@ -110,7 +112,8 @@
                 <tr>
                     <th>文件名 (File Name)</th>
                     <th>状态 (Status)</th>
-                    <th>操作 (Action)</th> </tr>
+                    <th>操作 (Action)</th>
+                </tr>
             </thead>
             <tbody id="queueBody"></tbody>
         </table>
@@ -160,10 +163,10 @@
 
 <script>
     // --- 1. 配置加载与本地存储逻辑 (LocalStorage) ---
-    // 修改了存储名称，强制浏览器读取你这套最新的完美预设
-    const STORAGE_KEY = 'fairlight_custom_preset_v1';
+    // 强制刷新一次存档名字，保证加载最新的默认预设
+    const STORAGE_KEY = 'fairlight_custom_preset_v2';
     
-    // 【专属出厂默认预设】完全匹配你截图里的设定
+    // 【专属出厂默认预设】完全匹配你的截图设定
     const defaultSettings = {
         preDelay: 40,
         room: 0.40,      
@@ -261,7 +264,7 @@
     document.getElementById('folderUpload').addEventListener('change', (e) => handleFiles(e.target.files));
     document.getElementById('fileUpload').addEventListener('change', (e) => handleFiles(e.target.files));
 
-    // 【修复】重新加回单独下载列
+    // 生成表格，包含操作列
     function renderQueueTable() {
         queueBody.innerHTML = fileQueue.map((item, index) => `
             <tr>
@@ -282,7 +285,7 @@
         }
     }
 
-    // 【修复】当状态变更为 done 时，生成单独下载按钮
+    // 动态更新表格内容，生成下载按钮
     function updateQueueItemUI(index) {
         const item = fileQueue[index];
         const statusTd = document.getElementById(`status-${index}`);
@@ -293,7 +296,7 @@
         
         if (item.status === 'done') {
             actionTd.innerHTML = `<a href="${item.url}" download="Reverb_${item.name}.wav" class="btn-download">💾 单独下载</a>`;
-        } else if (item.status === 'error') {
+        } else {
             actionTd.innerHTML = `-`;
         }
     }
@@ -352,6 +355,7 @@
                 const currentHighCut = parseFloat(document.getElementById('highCut').value);
                 const currentWet = parseFloat(document.getElementById('wet').value);
 
+                // 【绝版代码】恢复了绝对好用的 toDestination() 方法
                 const renderedBuffer = await Tone.Offline(() => {
                     const offPlayer = new Tone.Player(audioBuffer);
                     
@@ -365,8 +369,7 @@
                     offPlayer.connect(offCrossFade.a);
                     offPlayer.connect(offPreDelay);
                     
-                    // 【加固防错】强制标准连接物理主输出通道
-                    offCrossFade.connect(Tone.Destination);
+                    offCrossFade.toDestination(); // 退回已被验证能完美渲染的底层连线逻辑
                     
                     offPlayer.start(0);
                 }, audioBuffer.duration + 3.0); 
