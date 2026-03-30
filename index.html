@@ -9,7 +9,7 @@
     <style>
         /* 经典护眼豆沙绿主题 */
         body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; background-color: #C7EDCC; display: flex; justify-content: center; padding-top: 30px; padding-bottom: 50px; color: #2e3b32; margin: 0;}
-        .container { background: #f4faf6; padding: 25px 35px; border-radius: 12px; box-shadow: 0 8px 25px rgba(0, 100, 50, 0.08); width: 650px; border: 1px solid #a8c9b3; }
+        .container { background: #f4faf6; padding: 25px 35px; border-radius: 12px; box-shadow: 0 8px 25px rgba(0, 100, 50, 0.08); width: 680px; border: 1px solid #a8c9b3; }
         h2 { margin-top: 0; color: #1a2b22; text-align: center; font-weight: 600; font-size: 20px; border-bottom: 2px solid #d0e5d8; padding-bottom: 15px;}
         
         /* 文件上传区 */
@@ -22,15 +22,18 @@
         table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; }
         th, td { padding: 10px 12px; border-bottom: 1px solid #e3ede7; }
         th { background: #eef5f1; position: sticky; top: 0; z-index: 1; color: #4a6355; font-weight: bold;}
-        .file-name { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #333; }
+        .file-name { max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #333; }
         .status-wait { color: #888; }
         .status-processing { color: #00bcd4; font-weight: bold;}
         .status-done { color: #4CAF50; font-weight: bold;}
         .status-error { color: #f44336; font-weight: bold;}
         
-        /* 单独下载按钮样式 */
-        .btn-download { background: #5c8a6b; color: white; padding: 5px 10px; border-radius: 4px; text-decoration: none; font-size: 12px; display: inline-block; transition: 0.2s;}
+        /* 单独下载按钮样式 - 区分 WAV 和 MP4 */
+        .action-cell { display: flex; gap: 6px; }
+        .btn-download { background: #5c8a6b; color: white; padding: 5px 8px; border-radius: 4px; text-decoration: none; font-size: 11px; display: inline-block; transition: 0.2s; white-space: nowrap;}
         .btn-download:hover { background: #4a7357; }
+        .btn-download-mp4 { background: #4a789c; } /* 给 MP4 一个特别的蓝色区分一下 */
+        .btn-download-mp4:hover { background: #3b6382; }
         
         /* 专业控制面板样式 */
         .control-group { padding: 15px 0; border-top: 1px solid #d0e5d8; }
@@ -163,7 +166,6 @@
 
 <script>
     // --- 1. 配置加载与本地存储逻辑 (LocalStorage) ---
-    // 强制刷新一次存档名字，保证加载最新的默认预设
     const STORAGE_KEY = 'fairlight_custom_preset_v2';
     
     // 【专属出厂默认预设】完全匹配你的截图设定
@@ -285,7 +287,7 @@
         }
     }
 
-    // 动态更新表格内容，生成下载按钮
+    // 【新增功能】当状态变更为 done 时，生成两个下载按钮（WAV 和 MP4）
     function updateQueueItemUI(index) {
         const item = fileQueue[index];
         const statusTd = document.getElementById(`status-${index}`);
@@ -295,7 +297,13 @@
         statusTd.innerText = getStatusText(item.status);
         
         if (item.status === 'done') {
-            actionTd.innerHTML = `<a href="${item.url}" download="Reverb_${item.name}.wav" class="btn-download">💾 单独下载</a>`;
+            // 同一个资源链接 item.url，只要更改 download 属性的后缀，浏览器保存时就会自动改名
+            actionTd.innerHTML = `
+                <div class="action-cell">
+                    <a href="${item.url}" download="Reverb_${item.name}.wav" class="btn-download" title="标准音频格式">💾 WAV</a>
+                    <a href="${item.url}" download="Reverb_${item.name}.mp4" class="btn-download btn-download-mp4" title="强行改后缀供 Canva 导入">🎬 MP4</a>
+                </div>
+            `;
         } else {
             actionTd.innerHTML = `-`;
         }
@@ -355,7 +363,6 @@
                 const currentHighCut = parseFloat(document.getElementById('highCut').value);
                 const currentWet = parseFloat(document.getElementById('wet').value);
 
-                // 【绝版代码】恢复了绝对好用的 toDestination() 方法
                 const renderedBuffer = await Tone.Offline(() => {
                     const offPlayer = new Tone.Player(audioBuffer);
                     
