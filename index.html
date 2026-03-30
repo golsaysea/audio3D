@@ -3,89 +3,93 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>音频空间生成器 - 护眼记忆版</title>
+    <title>音频空间生成器 - 达芬奇大教堂护眼版</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
-        /* 禅意护眼暗色主题 (低对比度，柔和色调) */
-        body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; background-color: #1e211f; display: flex; justify-content: center; padding-top: 30px; padding-bottom: 50px; color: #a9b5ac; }
-        .container { background: #262a27; padding: 25px 35px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.4); width: 600px; border: 1px solid #363b37; }
-        h2 { margin-top: 0; color: #d0d8d1; text-align: center; font-weight: 500; font-size: 20px; border-bottom: 1px solid #363b37; padding-bottom: 15px;}
+        /* 经典护眼豆沙绿主题 */
+        body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; background-color: #C7EDCC; display: flex; justify-content: center; padding-top: 30px; padding-bottom: 50px; color: #2e3b32; margin: 0;}
+        .container { background: #f4faf6; padding: 25px 35px; border-radius: 12px; box-shadow: 0 8px 25px rgba(0, 100, 50, 0.08); width: 600px; border: 1px solid #a8c9b3; }
+        h2 { margin-top: 0; color: #1a2b22; text-align: center; font-weight: 600; font-size: 20px; border-bottom: 2px solid #d0e5d8; padding-bottom: 15px;}
         
         /* 文件上传区 */
         .upload-buttons { display: flex; gap: 10px; margin-top: 10px; margin-bottom: 20px;}
-        .upload-label { flex: 1; text-align: center; background: #2f3430; color: #9da89f; border: 1px dashed #4a524c; padding: 12px; border-radius: 6px; cursor: pointer; transition: 0.2s; font-size: 13px; }
-        .upload-label:hover { background: #383e39; color: #c4cdc5; border-color: #6a9955;}
+        .upload-label { flex: 1; text-align: center; background: #e3ede7; color: #4a6355; border: 2px dashed #9cb5a8; padding: 12px; border-radius: 6px; cursor: pointer; transition: all 0.2s; font-size: 13px; font-weight: bold;}
+        .upload-label:hover { background: #d0e0d6; border-color: #6b8e7b; color: #2e3b32;}
         
         /* 队列区域 */
-        .queue-container { max-height: 200px; overflow-y: auto; border: 1px solid #363b37; border-radius: 6px; margin-bottom: 20px; display: none; background: #1c1e1d; }
+        .queue-container { max-height: 200px; overflow-y: auto; border: 1px solid #c0d1c7; border-radius: 6px; margin-bottom: 20px; display: none; background: #ffffff; }
         table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; }
-        th, td { padding: 8px 12px; border-bottom: 1px solid #2f3430; }
-        th { background: #262a27; position: sticky; top: 0; z-index: 1; color: #879189; font-weight: normal;}
-        .file-name { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #c4cdc5; }
-        .status-wait { color: #879189; }
-        .status-processing { color: #4fc1ff; }
-        .status-done { color: #6a9955; }
-        .status-error { color: #f48771; }
+        th, td { padding: 10px 12px; border-bottom: 1px solid #e3ede7; }
+        th { background: #eef5f1; position: sticky; top: 0; z-index: 1; color: #4a6355; font-weight: bold;}
+        .file-name { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #333; }
+        .status-wait { color: #888; }
+        .status-processing { color: #00bcd4; font-weight: bold;}
+        .status-done { color: #4CAF50; font-weight: bold;}
+        .status-error { color: #f44336; font-weight: bold;}
         
         /* 专业控制面板样式 */
-        .control-group { padding: 15px 0; border-top: 1px solid #363b37; }
-        .panel-title { color: #d0d8d1; font-size: 13px; margin-bottom: 15px; display: flex; align-items: center; }
-        .panel-title::before { content: ''; display: inline-block; width: 8px; height: 8px; background: #6a9955; border-radius: 50%; margin-right: 8px; box-shadow: 0 0 6px rgba(106, 153, 85, 0.6); }
+        .control-group { padding: 15px 0; border-top: 1px solid #d0e5d8; }
+        .panel-title { color: #2e3b32; font-size: 14px; margin-bottom: 15px; display: flex; align-items: center; font-weight: bold;}
+        .panel-title::before { content: ''; display: inline-block; width: 8px; height: 8px; background: #5c8a6b; border-radius: 50%; margin-right: 8px; box-shadow: 0 0 5px rgba(92, 138, 107, 0.5); }
         
         .slider-row { display: flex; align-items: center; margin-bottom: 12px; justify-content: space-between;}
-        label { width: 150px; font-size: 12px; color: #9da89f; text-align: right; padding-right: 15px; }
+        label { width: 150px; font-size: 13px; color: #4a6355; text-align: right; padding-right: 15px; font-weight: 500;}
         input[type="range"] { 
             flex-grow: 1; 
             -webkit-appearance: none; 
-            background: #363b37; 
-            height: 4px; 
-            border-radius: 2px; 
+            background: #c0d1c7; 
+            height: 6px; 
+            border-radius: 3px; 
             outline: none; 
         }
         input[type="range"]::-webkit-slider-thumb { 
             -webkit-appearance: none; 
             width: 14px; height: 14px; 
-            background: #8aa682; 
+            background: #5c8a6b; 
             border-radius: 50%; 
             cursor: pointer; 
             transition: 0.1s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
         }
-        input[type="range"]::-webkit-slider-thumb:hover { background: #b5cead; transform: scale(1.1);}
+        input[type="range"]::-webkit-slider-thumb:hover { background: #3e634a; transform: scale(1.1);}
         
         .value-box { 
             width: 55px; 
-            background: #181a19; 
-            border: 1px solid #363b37; 
-            color: #c4cdc5; 
+            background: #ffffff; 
+            border: 1px solid #a8c9b3; 
+            color: #2e3b32; 
             text-align: center; 
             padding: 4px 0; 
             font-size: 12px; 
             border-radius: 4px; 
             margin-left: 15px;
-            font-family: 'Consolas', monospace;
+            font-family: monospace;
+            font-weight: bold;
         }
 
-        .unit { font-size: 10px; color: #6d766f; margin-left: 2px;}
+        .unit { font-size: 10px; color: #888; margin-left: 2px; font-weight: normal;}
 
-        /* 按钮组 (低饱和度护眼色) */
-        .btn-group { display: flex; gap: 10px; margin-top: 20px; border-top: 1px solid #363b37; padding-top: 20px;}
-        .btn { flex: 1; padding: 10px; color: #e0e5e1; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; transition: 0.2s; text-align: center; font-weight: 500;}
-        .btn-play { background: #4b6a43; }
-        .btn-play:hover { background: #5a7d51; }
-        .btn-batch { background: #3b5a75; }
-        .btn-batch:hover { background: #4a6d8c; }
-        .btn-zip { background: #624b75; }
-        .btn-zip:hover { background: #765a8c; }
-        .btn-folder { background: #854949; }
-        .btn-folder:hover { background: #a15959; }
-        .btn:disabled { background: #2f3430; color: #6d766f; cursor: not-allowed; opacity: 0.8;}
+        /* 按钮组 */
+        .btn-group { display: flex; gap: 10px; margin-top: 20px; border-top: 1px solid #d0e5d8; padding-top: 20px;}
+        .btn { flex: 1; padding: 10px; color: #fff; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; transition: 0.2s; text-align: center; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.1);}
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.15);}
+        .btn:active { transform: translateY(1px); box-shadow: none;}
+        .btn-play { background: #5c8a6b; }
+        .btn-play:hover { background: #4a7357; }
+        .btn-batch { background: #4a789c; }
+        .btn-batch:hover { background: #3b6382; }
+        .btn-zip { background: #8a6b9c; }
+        .btn-zip:hover { background: #715782; }
+        .btn-folder { background: #d37676; }
+        .btn-folder:hover { background: #b56363; }
+        .btn:disabled { background: #c0d1c7; color: #888; cursor: not-allowed; transform: none; box-shadow: none;}
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>Fairlight Audio - 护眼记忆版</h2>
+    <h2>🎧 DaVinci Cathedral - 护眼定制版</h2>
     
     <div class="upload-buttons">
         <label class="upload-label">
@@ -111,7 +115,7 @@
     </div>
 
     <div class="control-group">
-        <div class="panel-title">混响与空间重构链路 (Reverb Chain)</div>
+        <div class="panel-title">大教堂混响参数 (自动保存)</div>
         
         <div class="slider-row">
             <label>预延迟 (Pre-delay)</label>
@@ -121,8 +125,8 @@
         
         <div class="slider-row">
             <label>混响尺寸 (Room Size)</label>
-            <input type="range" id="room" min="0" max="0.99" step="0.01" value="0.40">
-            <div class="value-box"><span id="room-val">0.40</span><span class="unit"></span></div>
+            <input type="range" id="room" min="0" max="0.99" step="0.01" value="0.95">
+            <div class="value-box"><span id="room-val">0.95</span><span class="unit"></span></div>
         </div>
 
         <div class="slider-row">
@@ -146,67 +150,58 @@
 
     <div class="btn-group">
         <button id="playBtn" class="btn btn-play" disabled>▶ 试听 (Play)</button>
-        <button id="batchExportBtn" class="btn btn-batch" disabled>🚀 批量渲染 (Render)</button>
-        <button id="zipBtn" class="btn btn-zip" disabled>📦 打包 (ZIP)</button>
-        <button id="folderSaveBtn" class="btn btn-folder" disabled>📂 输出到目录 (Dir)</button>
+        <button id="batchExportBtn" class="btn btn-batch" disabled>🚀 批量渲染</button>
+        <button id="zipBtn" class="btn btn-zip" disabled>📦 打包 ZIP</button>
+        <button id="folderSaveBtn" class="btn btn-folder" disabled>📂 输出到目录</button>
     </div>
 </div>
 
 <script>
-    // --- 本地参数记忆核心逻辑 ---
-    // 1. 定义出厂默认值 (含你要求的 Room 0.4)
-    const defaultParams = {
+    // --- 1. 配置加载与本地存储逻辑 (LocalStorage) ---
+    // 更改了 Storage Key，强制重新读取达芬奇大教堂版本的默认值，防止被之前 0.4 的缓存污染
+    const STORAGE_KEY = 'fairlight_cathedral_green_v2';
+    const defaultSettings = {
         preDelay: 42,
-        room: 0.40,
+        room: 0.95,      // 恢复原汁原味的达芬奇大教堂 0.95 尺寸
         lowCut: 300,
         highCut: 10000,
         wet: 0.40
     };
 
-    // 2. 读取浏览器缓存，如果没有缓存则使用默认值
-    const savedParams = JSON.parse(localStorage.getItem('myFairlightSettings')) || defaultParams;
-
-    // --- 构建“达芬奇”效果器链路 (直接使用缓存值初始化) ---
-    const preDelayNode = new Tone.Delay(savedParams.preDelay / 1000); 
-    const reverbNode = new Tone.Freeverb({ roomSize: savedParams.room, dampening: 8000 });
-    const lowCutFilter = new Tone.Filter({ type: "highpass", frequency: savedParams.lowCut });
-    const highCutFilter = new Tone.Filter({ type: "lowpass", frequency: savedParams.highCut });
-    const crossFade = new Tone.CrossFade(savedParams.wet); 
-
-    // 湿声路径连接
-    preDelayNode.chain(lowCutFilter, highCutFilter, reverbNode, crossFade.b);
-    crossFade.toDestination();
-
-    // 3. 将缓存值反向同步给网页 UI 滑块和文字
-    function applySavedParamsToUI() {
-        document.getElementById('preDelay').value = savedParams.preDelay;
-        document.getElementById('preDelay-val').innerText = savedParams.preDelay;
-        
-        document.getElementById('room').value = savedParams.room;
-        document.getElementById('room-val').innerText = savedParams.room.toFixed(2);
-        
-        document.getElementById('lowCut').value = savedParams.lowCut;
-        document.getElementById('lowCut-val').innerText = savedParams.lowCut;
-        
-        document.getElementById('highCut').value = savedParams.highCut;
-        document.getElementById('highCut-val').innerText = savedParams.highCut;
-        
-        document.getElementById('wet').value = savedParams.wet;
-        document.getElementById('wet-val').innerText = savedParams.wet.toFixed(2);
+    // 读取本地缓存
+    function loadSettings() {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            try { return { ...defaultSettings, ...JSON.parse(saved) }; } 
+            catch (e) { return defaultSettings; }
+        }
+        return defaultSettings;
     }
-    applySavedParamsToUI(); // 页面一加载就执行
 
-    // 4. 保存当前参数到缓存的函数
-    function saveCurrentParams() {
-        const currentParams = {
+    const settings = loadSettings();
+
+    // 自动保存当前滑块的值
+    function saveSettings() {
+        const currentSettings = {
             preDelay: parseFloat(document.getElementById('preDelay').value),
             room: parseFloat(document.getElementById('room').value),
             lowCut: parseFloat(document.getElementById('lowCut').value),
             highCut: parseFloat(document.getElementById('highCut').value),
             wet: parseFloat(document.getElementById('wet').value)
         };
-        localStorage.setItem('myFairlightSettings', JSON.stringify(currentParams));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(currentSettings));
     }
+
+    // --- 2. 构建达芬奇大教堂音频链路 ---
+    const preDelayNode = new Tone.Delay(settings.preDelay / 1000); 
+    const reverbNode = new Tone.Freeverb({ roomSize: settings.room, dampening: 8000 });
+    const lowCutFilter = new Tone.Filter({ type: "highpass", frequency: settings.lowCut });
+    const highCutFilter = new Tone.Filter({ type: "lowpass", frequency: settings.highCut });
+    const crossFade = new Tone.CrossFade(settings.wet); 
+
+    // 湿声路径连接
+    preDelayNode.chain(lowCutFilter, highCutFilter, reverbNode, crossFade.b);
+    crossFade.toDestination();
 
     let player = null;
     let isPlaying = false;
@@ -223,6 +218,19 @@
         folderSaveBtn.title = "浏览器不支持直接写入文件夹";
     }
 
+    // 初始化UI界面
+    function initUI() {
+        const ids = ['preDelay', 'room', 'lowCut', 'highCut', 'wet'];
+        ids.forEach(id => {
+            document.getElementById(id).value = settings[id];
+            const display = document.getElementById(`${id}-val`);
+            if(id === 'room' || id === 'wet') display.innerText = settings[id].toFixed(2);
+            else display.innerText = settings[id];
+        });
+    }
+    initUI();
+
+    // --- 3. 核心交互与处理逻辑 ---
     const handleFiles = async (files) => {
         const audioFiles = Array.from(files).filter(f => f.type.startsWith('audio/') || f.name.match(/\.(wav|mp3|m4a|ogg|flac|aac)$/i));
         if (audioFiles.length === 0) return alert("未检测到有效的音频文件！");
@@ -247,7 +255,7 @@
         playBtn.innerText = "⏳ 加载中...";
         await Tone.loaded();
         playBtn.disabled = false;
-        playBtn.innerText = "▶ 试听首个 (Play)";
+        playBtn.innerText = "▶ 试听首个";
     };
 
     document.getElementById('folderUpload').addEventListener('change', (e) => handleFiles(e.target.files));
@@ -264,10 +272,10 @@
 
     function getStatusText(status) {
         switch(status) {
-            case 'wait': return 'Wait';
-            case 'processing': return 'Processing...';
-            case 'done': return 'Done';
-            case 'error': return 'Error';
+            case 'wait': return '等待处理';
+            case 'processing': return '处理中...';
+            case 'done': return '完成';
+            case 'error': return '失败';
             default: return '';
         }
     }
@@ -281,11 +289,12 @@
 
     playBtn.addEventListener('click', async () => {
         await Tone.start();
-        if (isPlaying) { player.stop(); playBtn.innerText = "▶ 试听 (Play)"; } 
-        else { player.start(); playBtn.innerText = "⏸ 暂停 (Pause)"; }
+        if (isPlaying) { player.stop(); playBtn.innerText = "▶ 试听首个"; } 
+        else { player.start(); playBtn.innerText = "⏸ 暂停"; }
         isPlaying = !isPlaying;
     });
 
+    // 参数绑定：滑动时即刻保存
     const bindSlider = (id, callback) => {
         const slider = document.getElementById(id);
         const display = document.getElementById(`${id}-val`);
@@ -295,7 +304,7 @@
             else display.innerText = val;
             
             callback(val);
-            saveCurrentParams(); // 每次拖动滑块，自动存入浏览器缓存
+            saveSettings(); 
         });
     };
 
@@ -309,7 +318,7 @@
         if (fileQueue.length === 0) return;
         
         batchExportBtn.disabled = true;
-        batchExportBtn.innerText = "⏳ Rendering...";
+        batchExportBtn.innerText = "⏳ 正在极速渲染...";
         playBtn.disabled = true; 
         zipBtn.disabled = true; 
         folderSaveBtn.disabled = true;
@@ -327,11 +336,11 @@
                 const arrayBuffer = await item.file.arrayBuffer();
                 const audioBuffer = await decodeCtx.decodeAudioData(arrayBuffer);
                 
-                const currentPreDelay = preDelayNode.delayTime.value;
-                const currentRoom = reverbNode.roomSize.value;
-                const currentLowCut = lowCutFilter.frequency.value;
-                const currentHighCut = highCutFilter.frequency.value;
-                const currentWet = crossFade.fade.value;
+                const currentPreDelay = parseFloat(document.getElementById('preDelay').value) / 1000;
+                const currentRoom = parseFloat(document.getElementById('room').value);
+                const currentLowCut = parseFloat(document.getElementById('lowCut').value);
+                const currentHighCut = parseFloat(document.getElementById('highCut').value);
+                const currentWet = parseFloat(document.getElementById('wet').value);
 
                 const renderedBuffer = await Tone.Offline(() => {
                     const offPlayer = new Tone.Player(audioBuffer);
@@ -348,6 +357,7 @@
                     
                     offCrossFade.toDestination(); 
                     
+                    // 同样保留了大教堂专属的 + 3.0秒 渲染时长，确保尾音自然衰减
                     offPlayer.start(0);
                 }, audioBuffer.duration + 3.0); 
 
@@ -363,7 +373,7 @@
             updateQueueItemUI(i);
         }
 
-        batchExportBtn.innerText = "✅ Render Complete";
+        batchExportBtn.innerText = "✅ 批量处理完成";
         playBtn.disabled = false;
         
         const hasDoneFiles = fileQueue.some(item => item.status === 'done');
@@ -373,7 +383,7 @@
         }
         
         setTimeout(() => {
-            batchExportBtn.innerText = "🚀 批量渲染 (Render)";
+            batchExportBtn.innerText = "🚀 再次批量渲染";
             batchExportBtn.disabled = false;
         }, 3000);
     });
@@ -381,7 +391,7 @@
     zipBtn.addEventListener('click', async () => {
         zipBtn.disabled = true;
         const originalText = zipBtn.innerText;
-        zipBtn.innerText = "⏳ Zipping...";
+        zipBtn.innerText = "⏳ 努力打包中...";
         try {
             const zip = new JSZip();
             let count = 0;
@@ -394,7 +404,7 @@
             const content = await zip.generateAsync({ type: "blob" });
             const url = URL.createObjectURL(content);
             const anchor = document.createElement('a');
-            anchor.download = `Fairlight_Batch_Output.zip`;
+            anchor.download = `Audio_Cathedral_Batch_${count}files.zip`;
             anchor.href = url;
             anchor.click();
             URL.revokeObjectURL(url);
@@ -412,7 +422,7 @@
             const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
             folderSaveBtn.disabled = true;
             const originalText = folderSaveBtn.innerText;
-            folderSaveBtn.innerText = "⏳ Writing...";
+            folderSaveBtn.innerText = "⏳ 正在写入...";
 
             for (const item of fileQueue) {
                 if (item.status === 'done' && item.blob) {
@@ -422,7 +432,7 @@
                     await writable.close();
                 }
             }
-            alert(`🎉 输出完成！`);
+            alert(`🎉 输出完成！成功保存到本地文件夹。`);
             folderSaveBtn.innerText = originalText;
             folderSaveBtn.disabled = false;
         } catch (error) {
