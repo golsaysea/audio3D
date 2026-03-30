@@ -155,24 +155,14 @@
 
 <script>
     // --- 构建“达芬奇”效果器链路 ---
-    // 1. 预延迟 (Pre-delay)
-    const preDelayNode = new Tone.Delay(0.042); // 42ms
-    
-    // 2. 空间混响主体 (使用接近 1 的 roomSize 模拟 Cathedral 的长尾音)
+    const preDelayNode = new Tone.Delay(0.042); 
     const reverbNode = new Tone.Freeverb({ roomSize: 0.95, dampening: 8000 });
-    
-    // 3. EQ 滤波 (模拟达芬奇的低切和高切)
     const lowCutFilter = new Tone.Filter({ type: "highpass", frequency: 300 });
     const highCutFilter = new Tone.Filter({ type: "lowpass", frequency: 10000 });
-    
-    // 4. 干湿比控制 (CrossFade)
-    const crossFade = new Tone.CrossFade(0.40); // 初始 wet 值为 0.40
+    const crossFade = new Tone.CrossFade(0.40); 
 
-    // 将这些节点固定连接好
-    // 湿声路径：Delay -> EQ -> Reverb -> CrossFade(B通道)
+    // 湿声路径连接
     preDelayNode.chain(lowCutFilter, highCutFilter, reverbNode, crossFade.b);
-    
-    // 输出到全局扬声器
     crossFade.toDestination();
 
     let player = null;
@@ -208,8 +198,6 @@
         const previewUrl = URL.createObjectURL(fileQueue[0].file);
         
         player = new Tone.Player(previewUrl);
-        
-        // 音源分两路：一路直接去 A 通道(干声)，一路去预延迟节点(湿声路径起点)
         player.connect(crossFade.a);
         player.connect(preDelayNode);
         
@@ -255,21 +243,18 @@
         isPlaying = !isPlaying;
     });
 
-    // 参数绑定
     const bindSlider = (id, callback) => {
         const slider = document.getElementById(id);
         const display = document.getElementById(`${id}-val`);
         slider.addEventListener('input', (e) => {
             let val = parseFloat(e.target.value);
-            // 格式化数值显示
             if(id === 'room' || id === 'wet') display.innerText = val.toFixed(2);
             else display.innerText = val;
-            
             callback(val);
         });
     };
 
-    bindSlider('preDelay', (val) => { preDelayNode.delayTime.value = val / 1000; }); // 毫秒转秒
+    bindSlider('preDelay', (val) => { preDelayNode.delayTime.value = val / 1000; }); 
     bindSlider('room', (val) => { reverbNode.roomSize.value = val; });
     bindSlider('lowCut', (val) => { lowCutFilter.frequency.value = val; });
     bindSlider('highCut', (val) => { highCutFilter.frequency.value = val; });
@@ -297,15 +282,14 @@
                 const arrayBuffer = await item.file.arrayBuffer();
                 const audioBuffer = await decodeCtx.decodeAudioData(arrayBuffer);
                 
-                // 获取当前参数
                 const currentPreDelay = preDelayNode.delayTime.value;
                 const currentRoom = reverbNode.roomSize.value;
                 const currentLowCut = lowCutFilter.frequency.value;
                 const currentHighCut = highCutFilter.frequency.value;
                 const currentWet = crossFade.fade.value;
 
-                // 重点：在后台重新构建完整的链路
-                const renderedBuffer = await Tone.Offline(({ context }) => {
+                // 修复：使用 () => 代替 ({ context }) =>，并使用 toDestination()
+                const renderedBuffer = await Tone.Offline(() => {
                     const offPlayer = new Tone.Player(audioBuffer);
                     
                     const offPreDelay = new Tone.Delay(currentPreDelay);
@@ -314,15 +298,15 @@
                     const offHighCut = new Tone.Filter({ type: "lowpass", frequency: currentHighCut });
                     const offCrossFade = new Tone.CrossFade(currentWet);
 
-                    // 重新连线
                     offPreDelay.chain(offLowCut, offHighCut, offReverb, offCrossFade.b);
                     offPlayer.connect(offCrossFade.a);
                     offPlayer.connect(offPreDelay);
                     
-                    offCrossFade.connect(context.destination);
+                    // 修复的核心位置在这里：
+                    offCrossFade.toDestination(); 
                     
                     offPlayer.start(0);
-                }, audioBuffer.duration + 3.0); // 增加3秒的渲染时间，防止大教堂的尾音被切断！
+                }, audioBuffer.duration + 3.0); 
 
                 const wavBlob = bufferToWave(renderedBuffer.get(), renderedBuffer.length);
                 item.blob = wavBlob;
