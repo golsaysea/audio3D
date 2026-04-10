@@ -32,9 +32,9 @@
         .action-cell { display: flex; gap: 6px; }
         .btn-download { background: #5c8a6b; color: white; padding: 5px 8px; border-radius: 4px; text-decoration: none; font-size: 11px; display: inline-block; transition: 0.2s; white-space: nowrap;}
         .btn-download:hover { background: #4a7357; }
-        .btn-download-mp3 { background: #e67e22; } /* 橙色 MP3 */
+        .btn-download-mp3 { background: #e67e22; } 
         .btn-download-mp3:hover { background: #d35400; }
-        .btn-download-mp4 { background: #4a789c; } /* 蓝色 MP4 */
+        .btn-download-mp4 { background: #4a789c; } 
         .btn-download-mp4:hover { background: #3b6382; }
         
         /* 专业控制面板样式 */
@@ -79,20 +79,53 @@
 
         .unit { font-size: 10px; color: #888; margin-left: 2px; font-weight: normal;}
 
-        /* 按钮组 */
-        .btn-group { display: flex; gap: 10px; margin-top: 20px; border-top: 1px solid #d0e5d8; padding-top: 20px;}
-        .btn { flex: 1; padding: 10px; color: #fff; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; transition: 0.2s; text-align: center; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.1);}
-        .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.15);}
-        .btn:active { transform: translateY(1px); box-shadow: none;}
+        /* --- 按钮组与下拉菜单样式修改 --- */
+        .btn-group { display: flex; gap: 10px; margin-top: 20px; border-top: 1px solid #d0e5d8; padding-top: 20px; align-items: stretch;}
+        .btn { flex: 1; padding: 10px; color: #fff; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; transition: 0.2s; text-align: center; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.1); width: 100%;}
+        .btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.15);}
+        .btn:active:not(:disabled) { transform: translateY(1px); box-shadow: none;}
         .btn-play { background: #5c8a6b; }
-        .btn-play:hover { background: #4a7357; }
+        .btn-play:hover:not(:disabled) { background: #4a7357; }
         .btn-batch { background: #4a789c; }
-        .btn-batch:hover { background: #3b6382; }
+        .btn-batch:hover:not(:disabled) { background: #3b6382; }
         .btn-zip { background: #8a6b9c; }
-        .btn-zip:hover { background: #715782; }
+        .btn-zip:hover:not(:disabled) { background: #715782; }
         .btn-folder { background: #d37676; }
-        .btn-folder:hover { background: #b56363; }
+        .btn-folder:hover:not(:disabled) { background: #b56363; }
         .btn:disabled { background: #c0d1c7; color: #888; cursor: not-allowed; transform: none; box-shadow: none;}
+
+        /* 向上弹出的下拉菜单容器 */
+        .dropdown { position: relative; flex: 1; display: flex; }
+        .dropdown-content { 
+            display: none; 
+            position: absolute; 
+            bottom: 100%; /* 向上弹出 */
+            left: 0; 
+            background-color: #ffffff; 
+            min-width: 100%; 
+            box-shadow: 0px -5px 15px rgba(0,0,0,0.15); 
+            z-index: 10; 
+            border-radius: 8px; 
+            overflow: hidden; 
+            margin-bottom: 8px;
+            border: 1px solid #a8c9b3;
+        }
+        .dropdown-content a { 
+            color: #2e3b32; 
+            padding: 10px 12px; 
+            text-decoration: none; 
+            display: block; 
+            font-size: 12px; 
+            font-weight: bold; 
+            text-align: left;
+            transition: 0.2s;
+            border-bottom: 1px solid #e3ede7;
+        }
+        .dropdown-content a:last-child { border-bottom: none; }
+        .dropdown-content a:hover { background-color: #d0e5d8; color: #1a2b22; padding-left: 18px;}
+        
+        .dropdown:not(.disabled):hover .dropdown-content { display: block; }
+        .dropdown.disabled { opacity: 0.8; pointer-events: none; cursor: not-allowed;}
     </style>
 </head>
 <body>
@@ -161,7 +194,17 @@
     <div class="btn-group">
         <button id="playBtn" class="btn btn-play" disabled>▶ 试听 (Play)</button>
         <button id="batchExportBtn" class="btn btn-batch" disabled>🚀 批量渲染</button>
-        <button id="zipBtn" class="btn btn-zip" disabled>📦 打包 ZIP</button>
+        
+        <div class="dropdown disabled" id="zipDropdownWrapper">
+            <button id="zipMainBtn" class="btn btn-zip" disabled>📦 打包 ZIP ▴</button>
+            <div class="dropdown-content" id="zipMenu">
+                <a href="#" data-mode="all">📦 全部打包 (WAV+MP3+MP4)</a>
+                <a href="#" data-mode="wav">💾 仅打包 WAV (标准格式)</a>
+                <a href="#" data-mode="mp3">🎵 仅打包 MP3</a>
+                <a href="#" data-mode="mp4">🎬 仅打包 MP4 (供 Canva)</a>
+            </div>
+        </div>
+
         <button id="folderSaveBtn" class="btn btn-folder" disabled>📂 输出到目录</button>
     </div>
 </div>
@@ -218,11 +261,28 @@
     const queueContainer = document.getElementById('queueContainer');
     const playBtn = document.getElementById('playBtn');
     const batchExportBtn = document.getElementById('batchExportBtn');
-    const zipBtn = document.getElementById('zipBtn');
+    
+    // UI 控制元素
+    const zipDropdownWrapper = document.getElementById('zipDropdownWrapper');
+    const zipMainBtn = document.getElementById('zipMainBtn');
+    const zipMenuOptions = document.querySelectorAll('#zipMenu a');
     const folderSaveBtn = document.getElementById('folderSaveBtn');
 
     if (!('showDirectoryPicker' in window)) {
         folderSaveBtn.title = "浏览器不支持直接写入文件夹";
+    }
+
+    // 统一下载按钮的激活/禁用状态
+    function enableDownloadOptions() {
+        zipMainBtn.disabled = false;
+        zipDropdownWrapper.classList.remove('disabled');
+        if ('showDirectoryPicker' in window) folderSaveBtn.disabled = false;
+    }
+    
+    function disableDownloadOptions() {
+        zipMainBtn.disabled = true;
+        zipDropdownWrapper.classList.add('disabled');
+        folderSaveBtn.disabled = true;
     }
 
     function initUI() {
@@ -248,8 +308,7 @@
         renderQueueTable();
         queueContainer.style.display = 'block';
         batchExportBtn.disabled = false;
-        zipBtn.disabled = true; 
-        folderSaveBtn.disabled = true;
+        disableDownloadOptions(); 
 
         if (player) { player.stop(); player.dispose(); }
         const previewUrl = URL.createObjectURL(fileQueue[0].file);
@@ -267,7 +326,6 @@
     document.getElementById('folderUpload').addEventListener('change', (e) => handleFiles(e.target.files));
     document.getElementById('fileUpload').addEventListener('change', (e) => handleFiles(e.target.files));
 
-    // 生成表格，包含操作列
     function renderQueueTable() {
         queueBody.innerHTML = fileQueue.map((item, index) => `
             <tr>
@@ -288,7 +346,6 @@
         }
     }
 
-    // 更新表格行：生成 WAV, MP3, MP4 按钮
     function updateQueueItemUI(index) {
         const item = fileQueue[index];
         const statusTd = document.getElementById(`status-${index}`);
@@ -342,8 +399,7 @@
         batchExportBtn.disabled = true;
         batchExportBtn.innerText = "⏳ 正在极速渲染...";
         playBtn.disabled = true; 
-        zipBtn.disabled = true; 
-        folderSaveBtn.disabled = true;
+        disableDownloadOptions();
         
         const decodeCtx = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -399,8 +455,7 @@
         
         const hasDoneFiles = fileQueue.some(item => item.status === 'done');
         if (hasDoneFiles) {
-            zipBtn.disabled = false;
-            if ('showDirectoryPicker' in window) folderSaveBtn.disabled = false;
+            enableDownloadOptions();
         }
         
         setTimeout(() => {
@@ -409,61 +464,74 @@
         }, 3000);
     });
 
-    // ZIP 打包逻辑：同时将三种格式全塞进去
-    zipBtn.addEventListener('click', async () => {
-        zipBtn.disabled = true;
-        const originalText = zipBtn.innerText;
-        zipBtn.innerText = "⏳ 努力打包中...";
-        try {
-            const zip = new JSZip();
-            let count = 0;
-            fileQueue.forEach(item => {
-                if (item.status === 'done' && item.blob) {
-                    zip.file(`Reverb_${item.name}.wav`, item.blob);
-                    zip.file(`Reverb_${item.name}.mp3`, item.blob); // 顺便包一个 MP3
-                    zip.file(`Reverb_${item.name}.mp4`, item.blob); // 顺便包一个 MP4
-                    count++;
-                }
-            });
-            const content = await zip.generateAsync({ type: "blob" });
-            const url = URL.createObjectURL(content);
-            const anchor = document.createElement('a');
-            anchor.download = `Audio_Batch_Processed_${count}files.zip`;
-            anchor.href = url;
-            anchor.click();
-            URL.revokeObjectURL(url);
-        } catch (error) {
-            alert("打包出错！");
-        } finally {
-            zipBtn.innerText = originalText;
-            zipBtn.disabled = false;
-        }
+    // --- 4. 菜单驱动的动态 ZIP 打包逻辑 ---
+    zipMenuOptions.forEach(option => {
+        option.addEventListener('click', async (e) => {
+            e.preventDefault(); 
+            if (zipMainBtn.disabled) return;
+
+            const mode = e.target.getAttribute('data-mode'); // all, wav, mp3, mp4
+            
+            zipMainBtn.disabled = true;
+            zipDropdownWrapper.classList.add('disabled');
+            const originalText = zipMainBtn.innerText;
+            zipMainBtn.innerText = "⏳ 努力打包中...";
+            
+            try {
+                const zip = new JSZip();
+                let count = 0;
+                
+                fileQueue.forEach(item => {
+                    if (item.status === 'done' && item.blob) {
+                        if (mode === 'all' || mode === 'wav') zip.file(`Reverb_${item.name}.wav`, item.blob);
+                        if (mode === 'all' || mode === 'mp3') zip.file(`Reverb_${item.name}.mp3`, item.blob);
+                        if (mode === 'all' || mode === 'mp4') zip.file(`Reverb_${item.name}.mp4`, item.blob);
+                        count++;
+                    }
+                });
+
+                if(count === 0) return;
+
+                const content = await zip.generateAsync({ type: "blob" });
+                const url = URL.createObjectURL(content);
+                const anchor = document.createElement('a');
+                
+                let typeName = mode.toUpperCase();
+                if(mode === 'all') typeName = "MIX";
+                
+                anchor.download = `Audio_${typeName}_Batch_${count}files.zip`;
+                anchor.href = url;
+                anchor.click();
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                alert("打包出错！");
+            } finally {
+                zipMainBtn.innerText = originalText;
+                enableDownloadOptions();
+            }
+        });
     });
 
-    // 直接输出到目录逻辑：同时写入三种格式的文件
     folderSaveBtn.addEventListener('click', async () => {
         if (!('showDirectoryPicker' in window)) return;
         try {
             const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-            folderSaveBtn.disabled = true;
+            disableDownloadOptions();
             const originalText = folderSaveBtn.innerText;
             folderSaveBtn.innerText = "⏳ 正在写入...";
 
             for (const item of fileQueue) {
                 if (item.status === 'done' && item.blob) {
-                    // 写 WAV
                     const fileHandleWav = await dirHandle.getFileHandle(`Reverb_${item.name}.wav`, { create: true });
                     const writableWav = await fileHandleWav.createWritable();
                     await writableWav.write(item.blob);
                     await writableWav.close();
 
-                    // 写 MP3
                     const fileHandleMp3 = await dirHandle.getFileHandle(`Reverb_${item.name}.mp3`, { create: true });
                     const writableMp3 = await fileHandleMp3.createWritable();
                     await writableMp3.write(item.blob);
                     await writableMp3.close();
 
-                    // 写 MP4
                     const fileHandleMp4 = await dirHandle.getFileHandle(`Reverb_${item.name}.mp4`, { create: true });
                     const writableMp4 = await fileHandleMp4.createWritable();
                     await writableMp4.write(item.blob);
@@ -472,10 +540,10 @@
             }
             alert(`🎉 输出完成！每份音频已同时保存为 .wav, .mp3, .mp4 格式到您的文件夹。`);
             folderSaveBtn.innerText = originalText;
-            folderSaveBtn.disabled = false;
+            enableDownloadOptions();
         } catch (error) {
             if (error.name !== 'AbortError') alert("保存失败，请检查权限！");
-            folderSaveBtn.disabled = false;
+            enableDownloadOptions();
         }
     });
 
