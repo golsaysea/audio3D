@@ -1,573 +1,86 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>音频空间生成器 - 护眼定制版</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <style>
-        /* 经典护眼豆沙绿主题 */
-        body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; background-color: #C7EDCC; display: flex; justify-content: center; padding-top: 30px; padding-bottom: 50px; color: #2e3b32; margin: 0;}
-        .container { background: #f4faf6; padding: 25px 35px; border-radius: 12px; box-shadow: 0 8px 25px rgba(0, 100, 50, 0.08); width: 680px; border: 1px solid #a8c9b3; }
-        h2 { margin-top: 0; color: #1a2b22; text-align: center; font-weight: 600; font-size: 20px; border-bottom: 2px solid #d0e5d8; padding-bottom: 15px;}
-        
-        /* 文件上传区 */
-        .upload-buttons { display: flex; gap: 10px; margin-top: 10px; margin-bottom: 20px;}
-        .upload-label { flex: 1; text-align: center; background: #e3ede7; color: #4a6355; border: 2px dashed #9cb5a8; padding: 12px; border-radius: 6px; cursor: pointer; transition: all 0.2s; font-size: 13px; font-weight: bold;}
-        .upload-label:hover { background: #d0e0d6; border-color: #6b8e7b; color: #2e3b32;}
-        
-        /* 队列区域 */
-        .queue-container { max-height: 200px; overflow-y: auto; border: 1px solid #c0d1c7; border-radius: 6px; margin-bottom: 20px; display: none; background: #ffffff; }
-        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; }
-        th, td { padding: 10px 12px; border-bottom: 1px solid #e3ede7; }
-        th { background: #eef5f1; position: sticky; top: 0; z-index: 1; color: #4a6355; font-weight: bold;}
-        .file-name { max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #333; }
-        .status-wait { color: #888; }
-        .status-processing { color: #00bcd4; font-weight: bold;}
-        .status-done { color: #4CAF50; font-weight: bold;}
-        .status-error { color: #f44336; font-weight: bold;}
-        
-        /* 单独下载按钮样式 - 区分 WAV, MP3 和 MP4 */
-        .action-cell { display: flex; gap: 6px; }
-        .btn-download { background: #5c8a6b; color: white; padding: 5px 8px; border-radius: 4px; text-decoration: none; font-size: 11px; display: inline-block; transition: 0.2s; white-space: nowrap;}
-        .btn-download:hover { background: #4a7357; }
-        .btn-download-mp3 { background: #e67e22; } 
-        .btn-download-mp3:hover { background: #d35400; }
-        .btn-download-mp4 { background: #4a789c; } 
-        .btn-download-mp4:hover { background: #3b6382; }
-        
-        /* 专业控制面板样式 */
-        .control-group { padding: 15px 0; border-top: 1px solid #d0e5d8; }
-        .panel-title { color: #2e3b32; font-size: 14px; margin-bottom: 15px; display: flex; align-items: center; font-weight: bold;}
-        .panel-title::before { content: ''; display: inline-block; width: 8px; height: 8px; background: #5c8a6b; border-radius: 50%; margin-right: 8px; box-shadow: 0 0 5px rgba(92, 138, 107, 0.5); }
-        
-        .slider-row { display: flex; align-items: center; margin-bottom: 12px; justify-content: space-between;}
-        label { width: 150px; font-size: 13px; color: #4a6355; text-align: right; padding-right: 15px; font-weight: 500;}
-        input[type="range"] { 
-            flex-grow: 1; 
-            -webkit-appearance: none; 
-            background: #c0d1c7; 
-            height: 6px; 
-            border-radius: 3px; 
-            outline: none; 
-        }
-        input[type="range"]::-webkit-slider-thumb { 
-            -webkit-appearance: none; 
-            width: 14px; height: 14px; 
-            background: #5c8a6b; 
-            border-radius: 50%; 
-            cursor: pointer; 
-            transition: 0.1s;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-        }
-        input[type="range"]::-webkit-slider-thumb:hover { background: #3e634a; transform: scale(1.1);}
-        
-        .value-box { 
-            width: 55px; 
-            background: #ffffff; 
-            border: 1px solid #a8c9b3; 
-            color: #2e3b32; 
-            text-align: center; 
-            padding: 4px 0; 
-            font-size: 12px; 
-            border-radius: 4px; 
-            margin-left: 15px;
-            font-family: monospace;
-            font-weight: bold;
-        }
-
-        .unit { font-size: 10px; color: #888; margin-left: 2px; font-weight: normal;}
-
-        /* --- 按钮组与下拉菜单样式修改 --- */
-        .btn-group { display: flex; gap: 10px; margin-top: 20px; border-top: 1px solid #d0e5d8; padding-top: 20px; align-items: stretch;}
-        .btn { flex: 1; padding: 10px; color: #fff; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; transition: 0.2s; text-align: center; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.1); width: 100%;}
-        .btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.15);}
-        .btn:active:not(:disabled) { transform: translateY(1px); box-shadow: none;}
-        .btn-play { background: #5c8a6b; }
-        .btn-play:hover:not(:disabled) { background: #4a7357; }
-        .btn-batch { background: #4a789c; }
-        .btn-batch:hover:not(:disabled) { background: #3b6382; }
-        .btn-zip { background: #8a6b9c; }
-        .btn-zip:hover:not(:disabled) { background: #715782; }
-        .btn-folder { background: #d37676; }
-        .btn-folder:hover:not(:disabled) { background: #b56363; }
-        .btn:disabled { background: #c0d1c7; color: #888; cursor: not-allowed; transform: none; box-shadow: none;}
-
-        /* 向上弹出的下拉菜单容器 */
-        .dropdown { position: relative; flex: 1; display: flex; }
-        .dropdown-content { 
-            display: none; 
-            position: absolute; 
-            bottom: 100%; /* 向上弹出 */
-            left: 0; 
-            background-color: #ffffff; 
-            min-width: 100%; 
-            box-shadow: 0px -5px 15px rgba(0,0,0,0.15); 
-            z-index: 10; 
-            border-radius: 8px; 
-            overflow: hidden; 
-            margin-bottom: 8px;
-            border: 1px solid #a8c9b3;
-        }
-        .dropdown-content a { 
-            color: #2e3b32; 
-            padding: 10px 12px; 
-            text-decoration: none; 
-            display: block; 
-            font-size: 12px; 
-            font-weight: bold; 
-            text-align: left;
-            transition: 0.2s;
-            border-bottom: 1px solid #e3ede7;
-        }
-        .dropdown-content a:last-child { border-bottom: none; }
-        .dropdown-content a:hover { background-color: #d0e5d8; color: #1a2b22; padding-left: 18px;}
-        
-        .dropdown:not(.disabled):hover .dropdown-content { display: block; }
-        .dropdown.disabled { opacity: 0.8; pointer-events: none; cursor: not-allowed;}
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audio3D Studio - Pages Edition</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
+<style>
+:root{--page:#c7edcc;--panel:#f7fbf8;--white:#fff;--line:#b8d0c1;--soft:#dbe9df;--text:#203027;--muted:#587062;--green:#4f8860;--green2:#3d6d4c;--blue:#477ea2;--blue2:#356884;--violet:#7d6796;--violet2:#66517d;--rose:#c76d6d;--rose2:#a95a5a;--orange:#d97827;--orange2:#bd6418}*{box-sizing:border-box}body{margin:0;min-height:100vh;padding:28px 16px 48px;display:flex;justify-content:center;background:var(--page);color:var(--text);font-family:"Segoe UI","Microsoft YaHei",Arial,sans-serif}.container{width:min(840px,100%);background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 26px rgba(26,82,48,.1);padding:24px 28px 28px}h1{margin:0 0 18px;padding-bottom:14px;border-bottom:2px solid var(--soft);color:#17251d;text-align:center;font-size:22px;font-weight:700;letter-spacing:0}.upload-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:12px 0 18px}.upload-label{min-height:54px;display:flex;align-items:center;justify-content:center;text-align:center;background:#e6f0ea;color:var(--muted);border:2px dashed #95b6a1;border-radius:8px;padding:12px;cursor:pointer;transition:.2s;font-size:13px;font-weight:700}.upload-label:hover{background:#d8e7dd;border-color:var(--green);color:var(--text);transform:translateY(-1px)}.queue-container{display:none;max-height:230px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;margin-bottom:18px;background:var(--white)}table{width:100%;border-collapse:collapse;text-align:left;font-size:12px}th,td{padding:10px 12px;border-bottom:1px solid #e3ede7;vertical-align:middle}th{position:sticky;top:0;z-index:1;background:#eef6f1;color:var(--muted);font-weight:700}.file-name{max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#26352b}.file-type{color:#546c5e;white-space:nowrap}.status-wait{color:#7b837e}.status-processing{color:#1689a7;font-weight:700}.status-done{color:#3e8f4f;font-weight:700}.status-error{color:#d14343;font-weight:700}.action-cell{display:flex;flex-wrap:wrap;gap:6px}.btn-download{display:inline-flex;align-items:center;justify-content:center;min-width:54px;min-height:28px;padding:5px 8px;border-radius:5px;background:var(--green);color:#fff;text-decoration:none;font-size:11px;font-weight:700;transition:.2s;white-space:nowrap}.btn-download:hover{background:var(--green2);transform:translateY(-1px)}.btn-download-mp3{background:var(--orange)}.btn-download-mp3:hover{background:var(--orange2)}.control-group{padding:16px 0;border-top:1px solid var(--soft)}.panel-title{display:flex;align-items:center;margin-bottom:14px;color:var(--text);font-size:14px;font-weight:700}.panel-title:before{content:"";width:8px;height:8px;margin-right:8px;border-radius:50%;background:var(--green);box-shadow:0 0 7px rgba(79,136,96,.55)}.control-grid{display:grid;grid-template-columns:1fr 1fr;column-gap:20px}.slider-row,.select-row{display:grid;grid-template-columns:150px minmax(0,1fr) 68px;align-items:center;gap:12px;margin-bottom:12px}.select-row{grid-template-columns:150px minmax(0,1fr)}label{color:var(--muted);text-align:right;font-size:13px;font-weight:600}input[type=range]{width:100%;min-width:0;height:6px;border-radius:3px;outline:none;background:#bfd2c6;-webkit-appearance:none;appearance:none}input[type=range]::-webkit-slider-thumb{width:15px;height:15px;border-radius:50%;background:var(--green);cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.24);-webkit-appearance:none;transition:.12s}input[type=range]::-webkit-slider-thumb:hover{background:var(--green2);transform:scale(1.1)}input[type=range]::-moz-range-thumb{width:15px;height:15px;border:none;border-radius:50%;background:var(--green);cursor:pointer}select{width:100%;min-height:34px;border:1px solid var(--line);border-radius:7px;padding:5px 10px;background:#fff;color:var(--text);font-size:13px;font-weight:650;outline:none}select:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(79,136,96,.12)}.value-box{min-width:68px;background:#fff;border:1px solid var(--line);border-radius:5px;color:var(--text);text-align:center;padding:5px 4px;font-family:Consolas,"Courier New",monospace;font-size:12px;font-weight:700;white-space:nowrap}.unit{margin-left:2px;color:#78837d;font-size:10px;font-weight:500}.btn-group{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:4px;padding-top:20px;border-top:1px solid var(--soft)}.btn{width:100%;min-height:40px;border:0;border-radius:7px;padding:10px;color:#fff;font-size:13px;font-weight:700;text-align:center;cursor:pointer;transition:.2s;box-shadow:0 2px 5px rgba(0,0,0,.12)}.btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 4px 10px rgba(0,0,0,.16)}.btn:active:not(:disabled){transform:translateY(1px);box-shadow:none}.btn:disabled{background:#c0d1c7;color:#77847c;cursor:not-allowed;transform:none;box-shadow:none}.btn-play{background:var(--green)}.btn-play:hover:not(:disabled){background:var(--green2)}.btn-batch{background:var(--blue)}.btn-batch:hover:not(:disabled){background:var(--blue2)}.btn-zip{background:var(--violet)}.btn-zip:hover:not(:disabled){background:var(--violet2)}.btn-folder{background:var(--rose)}.btn-folder:hover:not(:disabled){background:var(--rose2)}.dropdown{position:relative;display:flex;min-width:0}.dropdown-content{display:none;position:absolute;bottom:100%;left:0;z-index:10;min-width:100%;overflow:hidden;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:#fff;box-shadow:0 -5px 15px rgba(0,0,0,.15)}.dropdown-content a{display:block;padding:10px 12px;border-bottom:1px solid #e3ede7;color:var(--text);text-decoration:none;font-size:12px;font-weight:700;white-space:nowrap;transition:.2s}.dropdown-content a:last-child{border-bottom:0}.dropdown-content a:hover{background:#dcebe2;padding-left:18px}.dropdown:not(.disabled):hover .dropdown-content,.dropdown:not(.disabled):focus-within .dropdown-content{display:block}.dropdown.disabled{opacity:.8;pointer-events:none}@media(max-width:760px){.container{padding:20px 16px 22px}.upload-buttons,.control-grid,.btn-group{grid-template-columns:1fr}.slider-row,.select-row{grid-template-columns:118px minmax(0,1fr) 64px;gap:9px}.select-row{grid-template-columns:118px minmax(0,1fr)}label{font-size:12px}h1{font-size:19px}th:nth-child(2),td:nth-child(2){display:none}}@media(max-width:460px){body{padding:14px 8px 28px}.slider-row,.select-row{grid-template-columns:1fr;gap:7px}label{text-align:left}.value-box{width:100%}.file-name{max-width:150px}}
+</style>
 </head>
 <body>
-
 <div class="container">
-    <h2>🎧 DaVinci Cathedral - 护眼定制版</h2>
-    
-    <div class="upload-buttons">
-        <label class="upload-label">
-            📁 选择文件夹导入 (Folder)
-            <input type="file" id="folderUpload" webkitdirectory directory multiple style="display:none;">
-        </label>
-        <label class="upload-label">
-            📄 选择多文件导入 (Files)
-            <input type="file" id="fileUpload" accept="audio/*" multiple style="display:none;">
-        </label>
-    </div>
-
-    <div class="queue-container" id="queueContainer">
-        <table>
-            <thead>
-                <tr>
-                    <th>文件名 (File Name)</th>
-                    <th>状态 (Status)</th>
-                    <th>操作 (Action)</th>
-                </tr>
-            </thead>
-            <tbody id="queueBody"></tbody>
-        </table>
-    </div>
-
-    <div class="control-group">
-        <div class="panel-title">大教堂混响参数 (自动保存)</div>
-        
-        <div class="slider-row">
-            <label>预延迟 (Pre-delay)</label>
-            <input type="range" id="preDelay" min="0" max="200" step="1" value="0">
-            <div class="value-box"><span id="preDelay-val">0</span><span class="unit">ms</span></div>
-        </div>
-        
-        <div class="slider-row">
-            <label>混响尺寸 (Room Size)</label>
-            <input type="range" id="room" min="0" max="0.99" step="0.01" value="0.90">
-            <div class="value-box"><span id="room-val">0.90</span><span class="unit"></span></div>
-        </div>
-
-        <div class="slider-row">
-            <label>早期反射低切 (Low Cut)</label>
-            <input type="range" id="lowCut" min="20" max="1000" step="10" value="300">
-            <div class="value-box"><span id="lowCut-val">300</span><span class="unit">Hz</span></div>
-        </div>
-
-        <div class="slider-row">
-            <label>早期反射高切 (High Cut)</label>
-            <input type="range" id="highCut" min="5000" max="20000" step="100" value="10000">
-            <div class="value-box"><span id="highCut-val">10000</span><span class="unit">Hz</span></div>
-        </div>
-
-        <div class="slider-row" style="margin-top: 25px;">
-            <label>干/湿比例 (Dry/Wet)</label>
-            <input type="range" id="wet" min="0" max="1" step="0.01" value="0.04">
-            <div class="value-box"><span id="wet-val">0.04</span><span class="unit"></span></div>
-        </div>
-    </div>
-
-    <div class="btn-group">
-        <button id="playBtn" class="btn btn-play" disabled>▶ 试听 (Play)</button>
-        <button id="batchExportBtn" class="btn btn-batch" disabled>🚀 批量渲染</button>
-        
-        <div class="dropdown disabled" id="zipDropdownWrapper">
-            <button id="zipMainBtn" class="btn btn-zip" disabled>📦 打包 ZIP ▴</button>
-            <div class="dropdown-content" id="zipMenu">
-                <a href="#" data-mode="all">📦 全部打包 (WAV+MP3+MP4)</a>
-                <a href="#" data-mode="wav">💾 仅打包 WAV (标准格式)</a>
-                <a href="#" data-mode="mp3">🎵 仅打包 MP3</a>
-                <a href="#" data-mode="mp4">🎬 仅打包 MP4 (供 Canva)</a>
-            </div>
-        </div>
-
-        <button id="folderSaveBtn" class="btn btn-folder" disabled>📂 输出到目录</button>
-    </div>
+<h1>Audio3D Studio - 护眼高级版</h1>
+<div class="upload-buttons"><label class="upload-label">选择文件夹导入<input type="file" id="folderUpload" webkitdirectory directory multiple style="display:none;"></label><label class="upload-label">选择音频 / MP4<input type="file" id="fileUpload" accept="audio/*,video/mp4,video/webm,video/quicktime,.wav,.mp3,.m4a,.aac,.ogg,.flac,.mp4,.m4v,.mov,.webm" multiple style="display:none;"></label></div>
+<div class="queue-container" id="queueContainer"><table><thead><tr><th>文件名</th><th>类型</th><th>状态</th><th>操作</th></tr></thead><tbody id="queueBody"></tbody></table></div>
+<div class="control-group"><div class="panel-title">音色与节奏</div><div class="control-grid"><div class="select-row"><label for="effectPreset">效果预设</label><select id="effectPreset"><option value="cathedral">大教堂空间</option><option value="clean">原声增强</option><option value="phone">电话音</option><option value="electro">电音空间</option><option value="robot">机器人音</option><option value="lofi">Lo-fi 旧磁带</option></select></div><div class="slider-row"><label for="pitch">音调调整</label><input type="range" id="pitch" min="-12" max="12" step="1" value="0"><div class="value-box"><span id="pitch-val">+0</span><span class="unit">st</span></div></div><div class="slider-row"><label for="speed">速度调整</label><input type="range" id="speed" min="0.50" max="1.80" step="0.01" value="1"><div class="value-box"><span id="speed-val">1.00</span><span class="unit">x</span></div></div><div class="slider-row"><label for="motion">环绕运动</label><input type="range" id="motion" min="0" max="1" step="0.01" value="0"><div class="value-box"><span id="motion-val">0</span><span class="unit">%</span></div></div></div></div>
+<div class="control-group"><div class="panel-title">空间与混响</div><div class="control-grid"><div class="slider-row"><label for="pan">左右定位</label><input type="range" id="pan" min="-1" max="1" step="0.01" value="0"><div class="value-box"><span id="pan-val">0.00</span></div></div><div class="slider-row"><label for="preDelay">预延迟</label><input type="range" id="preDelay" min="0" max="200" step="1" value="40"><div class="value-box"><span id="preDelay-val">40</span><span class="unit">ms</span></div></div><div class="slider-row"><label for="room">混响尺寸</label><input type="range" id="room" min="0" max="0.99" step="0.01" value="0.40"><div class="value-box"><span id="room-val">0.40</span></div></div><div class="slider-row"><label for="lowCut">低切</label><input type="range" id="lowCut" min="20" max="1000" step="10" value="300"><div class="value-box"><span id="lowCut-val">300</span><span class="unit">Hz</span></div></div><div class="slider-row"><label for="highCut">高切</label><input type="range" id="highCut" min="5000" max="20000" step="100" value="10000"><div class="value-box"><span id="highCut-val">10000</span><span class="unit">Hz</span></div></div><div class="slider-row"><label for="wet">混响比例</label><input type="range" id="wet" min="0" max="1" step="0.01" value="0.10"><div class="value-box"><span id="wet-val">0.10</span></div></div></div></div>
+<div class="btn-group"><button id="playBtn" class="btn btn-play" disabled>试听首个</button><button id="batchExportBtn" class="btn btn-batch" disabled>批量渲染</button><div class="dropdown disabled" id="zipDropdownWrapper"><button id="zipMainBtn" class="btn btn-zip" disabled>打包 ZIP ▴</button><div class="dropdown-content" id="zipMenu"><a href="#" data-mode="all">全部打包 WAV + MP3</a><a href="#" data-mode="wav">仅打包 WAV</a><a href="#" data-mode="mp3">仅打包 MP3</a></div></div><button id="folderSaveBtn" class="btn btn-folder" disabled>输出到目录</button></div>
 </div>
-
 <script>
-    // --- 1. 配置加载与本地存储逻辑 (LocalStorage) ---
-    const STORAGE_KEY = 'fairlight_custom_preset_v2';
-    
-    const defaultSettings = {
-        preDelay: 40,
-        room: 0.40,      
-        lowCut: 300,
-        highCut: 10000,
-        wet: 0.10
-    };
-
-    function loadSettings() {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-            try { return { ...defaultSettings, ...JSON.parse(saved) }; } 
-            catch (e) { return defaultSettings; }
-        }
-        return defaultSettings;
-    }
-
-    const settings = loadSettings();
-
-    function saveSettings() {
-        const currentSettings = {
-            preDelay: parseFloat(document.getElementById('preDelay').value),
-            room: parseFloat(document.getElementById('room').value),
-            lowCut: parseFloat(document.getElementById('lowCut').value),
-            highCut: parseFloat(document.getElementById('highCut').value),
-            wet: parseFloat(document.getElementById('wet').value)
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(currentSettings));
-    }
-
-    // --- 2. 构建核心音频链路 ---
-    const preDelayNode = new Tone.Delay(settings.preDelay / 1000); 
-    const reverbNode = new Tone.Freeverb({ roomSize: settings.room, dampening: 8000 });
-    const lowCutFilter = new Tone.Filter({ type: "highpass", frequency: settings.lowCut });
-    const highCutFilter = new Tone.Filter({ type: "lowpass", frequency: settings.highCut });
-    const crossFade = new Tone.CrossFade(settings.wet); 
-
-    preDelayNode.chain(lowCutFilter, highCutFilter, reverbNode, crossFade.b);
-    crossFade.toDestination();
-
-    let player = null;
-    let isPlaying = false;
-    let fileQueue = []; 
-    
-    const queueBody = document.getElementById('queueBody');
-    const queueContainer = document.getElementById('queueContainer');
-    const playBtn = document.getElementById('playBtn');
-    const batchExportBtn = document.getElementById('batchExportBtn');
-    
-    // UI 控制元素
-    const zipDropdownWrapper = document.getElementById('zipDropdownWrapper');
-    const zipMainBtn = document.getElementById('zipMainBtn');
-    const zipMenuOptions = document.querySelectorAll('#zipMenu a');
-    const folderSaveBtn = document.getElementById('folderSaveBtn');
-
-    if (!('showDirectoryPicker' in window)) {
-        folderSaveBtn.title = "浏览器不支持直接写入文件夹";
-    }
-
-    // 统一下载按钮的激活/禁用状态
-    function enableDownloadOptions() {
-        zipMainBtn.disabled = false;
-        zipDropdownWrapper.classList.remove('disabled');
-        if ('showDirectoryPicker' in window) folderSaveBtn.disabled = false;
-    }
-    
-    function disableDownloadOptions() {
-        zipMainBtn.disabled = true;
-        zipDropdownWrapper.classList.add('disabled');
-        folderSaveBtn.disabled = true;
-    }
-
-    function initUI() {
-        const ids = ['preDelay', 'room', 'lowCut', 'highCut', 'wet'];
-        ids.forEach(id => {
-            document.getElementById(id).value = settings[id];
-            const display = document.getElementById(`${id}-val`);
-            if(id === 'room' || id === 'wet') display.innerText = settings[id].toFixed(2);
-            else display.innerText = settings[id];
-        });
-    }
-    initUI();
-
-    // --- 3. 核心交互与处理逻辑 ---
-    const handleFiles = async (files) => {
-        const audioFiles = Array.from(files).filter(f => f.type.startsWith('audio/') || f.name.match(/\.(wav|mp3|m4a|ogg|flac|aac)$/i));
-        if (audioFiles.length === 0) return alert("未检测到有效的音频文件！");
-
-        fileQueue = audioFiles.map(f => ({
-            file: f, name: f.name.replace(/\.[^/.]+$/, ""), status: 'wait', url: null, blob: null
-        }));
-
-        renderQueueTable();
-        queueContainer.style.display = 'block';
-        batchExportBtn.disabled = false;
-        disableDownloadOptions(); 
-
-        if (player) { player.stop(); player.dispose(); }
-        const previewUrl = URL.createObjectURL(fileQueue[0].file);
-        
-        player = new Tone.Player(previewUrl);
-        player.connect(crossFade.a);
-        player.connect(preDelayNode);
-        
-        playBtn.innerText = "⏳ 加载中...";
-        await Tone.loaded();
-        playBtn.disabled = false;
-        playBtn.innerText = "▶ 试听首个";
-    };
-
-    document.getElementById('folderUpload').addEventListener('change', (e) => handleFiles(e.target.files));
-    document.getElementById('fileUpload').addEventListener('change', (e) => handleFiles(e.target.files));
-
-    function renderQueueTable() {
-        queueBody.innerHTML = fileQueue.map((item, index) => `
-            <tr>
-                <td class="file-name" title="${item.file.name}">${item.file.name}</td>
-                <td id="status-${index}" class="status-${item.status}">${getStatusText(item.status)}</td>
-                <td id="action-${index}">-</td>
-            </tr>
-        `).join('');
-    }
-
-    function getStatusText(status) {
-        switch(status) {
-            case 'wait': return '等待处理';
-            case 'processing': return '处理中...';
-            case 'done': return '完成';
-            case 'error': return '失败';
-            default: return '';
-        }
-    }
-
-    function updateQueueItemUI(index) {
-        const item = fileQueue[index];
-        const statusTd = document.getElementById(`status-${index}`);
-        const actionTd = document.getElementById(`action-${index}`);
-        
-        statusTd.className = `status-${item.status}`;
-        statusTd.innerText = getStatusText(item.status);
-        
-        if (item.status === 'done') {
-            actionTd.innerHTML = `
-                <div class="action-cell">
-                    <a href="${item.url}" download="Reverb_${item.name}.wav" class="btn-download" title="标准音频">💾 WAV</a>
-                    <a href="${item.url}" download="Reverb_${item.name}.mp3" class="btn-download btn-download-mp3" title="改名MP3">🎵 MP3</a>
-                    <a href="${item.url}" download="Reverb_${item.name}.mp4" class="btn-download btn-download-mp4" title="改名MP4供Canva用">🎬 MP4</a>
-                </div>
-            `;
-        } else {
-            actionTd.innerHTML = `-`;
-        }
-    }
-
-    playBtn.addEventListener('click', async () => {
-        await Tone.start();
-        if (isPlaying) { player.stop(); playBtn.innerText = "▶ 试听首个"; } 
-        else { player.start(); playBtn.innerText = "⏸ 暂停"; }
-        isPlaying = !isPlaying;
-    });
-
-    const bindSlider = (id, callback) => {
-        const slider = document.getElementById(id);
-        const display = document.getElementById(`${id}-val`);
-        slider.addEventListener('input', (e) => {
-            let val = parseFloat(e.target.value);
-            if(id === 'room' || id === 'wet') display.innerText = val.toFixed(2);
-            else display.innerText = val;
-            
-            callback(val);
-            saveSettings(); 
-        });
-    };
-
-    bindSlider('preDelay', (val) => { preDelayNode.delayTime.value = val / 1000; }); 
-    bindSlider('room', (val) => { reverbNode.roomSize.value = val; });
-    bindSlider('lowCut', (val) => { lowCutFilter.frequency.value = val; });
-    bindSlider('highCut', (val) => { highCutFilter.frequency.value = val; });
-    bindSlider('wet', (val) => { crossFade.fade.value = val; });
-
-    batchExportBtn.addEventListener('click', async () => {
-        if (fileQueue.length === 0) return;
-        
-        batchExportBtn.disabled = true;
-        batchExportBtn.innerText = "⏳ 正在极速渲染...";
-        playBtn.disabled = true; 
-        disableDownloadOptions();
-        
-        const decodeCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-        for (let i = 0; i < fileQueue.length; i++) {
-            let item = fileQueue[i];
-            if (item.status === 'done') continue; 
-
-            item.status = 'processing';
-            updateQueueItemUI(i);
-
-            try {
-                const arrayBuffer = await item.file.arrayBuffer();
-                const audioBuffer = await decodeCtx.decodeAudioData(arrayBuffer);
-                
-                const currentPreDelay = parseFloat(document.getElementById('preDelay').value) / 1000;
-                const currentRoom = parseFloat(document.getElementById('room').value);
-                const currentLowCut = parseFloat(document.getElementById('lowCut').value);
-                const currentHighCut = parseFloat(document.getElementById('highCut').value);
-                const currentWet = parseFloat(document.getElementById('wet').value);
-
-                const renderedBuffer = await Tone.Offline(() => {
-                    const offPlayer = new Tone.Player(audioBuffer);
-                    
-                    const offPreDelay = new Tone.Delay(currentPreDelay);
-                    const offReverb = new Tone.Freeverb({ roomSize: currentRoom, dampening: 8000 });
-                    const offLowCut = new Tone.Filter({ type: "highpass", frequency: currentLowCut });
-                    const offHighCut = new Tone.Filter({ type: "lowpass", frequency: currentHighCut });
-                    const offCrossFade = new Tone.CrossFade(currentWet);
-
-                    offPreDelay.chain(offLowCut, offHighCut, offReverb, offCrossFade.b);
-                    offPlayer.connect(offCrossFade.a);
-                    offPlayer.connect(offPreDelay);
-                    
-                    offCrossFade.toDestination();
-                    
-                    offPlayer.start(0);
-                }, audioBuffer.duration + 3.0); 
-
-                const wavBlob = bufferToWave(renderedBuffer.get(), renderedBuffer.length);
-                item.blob = wavBlob;
-                item.url = URL.createObjectURL(wavBlob);
-                item.status = 'done';
-
-            } catch (error) {
-                console.error(`文件 ${item.name} 处理失败:`, error);
-                item.status = 'error';
-            }
-            updateQueueItemUI(i);
-        }
-
-        batchExportBtn.innerText = "✅ 批量处理完成";
-        playBtn.disabled = false;
-        
-        const hasDoneFiles = fileQueue.some(item => item.status === 'done');
-        if (hasDoneFiles) {
-            enableDownloadOptions();
-        }
-        
-        setTimeout(() => {
-            batchExportBtn.innerText = "🚀 再次批量渲染";
-            batchExportBtn.disabled = false;
-        }, 3000);
-    });
-
-    // --- 4. 菜单驱动的动态 ZIP 打包逻辑 ---
-    zipMenuOptions.forEach(option => {
-        option.addEventListener('click', async (e) => {
-            e.preventDefault(); 
-            if (zipMainBtn.disabled) return;
-
-            const mode = e.target.getAttribute('data-mode'); // all, wav, mp3, mp4
-            
-            zipMainBtn.disabled = true;
-            zipDropdownWrapper.classList.add('disabled');
-            const originalText = zipMainBtn.innerText;
-            zipMainBtn.innerText = "⏳ 努力打包中...";
-            
-            try {
-                const zip = new JSZip();
-                let count = 0;
-                
-                fileQueue.forEach(item => {
-                    if (item.status === 'done' && item.blob) {
-                        if (mode === 'all' || mode === 'wav') zip.file(`Reverb_${item.name}.wav`, item.blob);
-                        if (mode === 'all' || mode === 'mp3') zip.file(`Reverb_${item.name}.mp3`, item.blob);
-                        if (mode === 'all' || mode === 'mp4') zip.file(`Reverb_${item.name}.mp4`, item.blob);
-                        count++;
-                    }
-                });
-
-                if(count === 0) return;
-
-                const content = await zip.generateAsync({ type: "blob" });
-                const url = URL.createObjectURL(content);
-                const anchor = document.createElement('a');
-                
-                let typeName = mode.toUpperCase();
-                if(mode === 'all') typeName = "MIX";
-                
-                anchor.download = `Audio_${typeName}_Batch_${count}files.zip`;
-                anchor.href = url;
-                anchor.click();
-                URL.revokeObjectURL(url);
-            } catch (error) {
-                alert("打包出错！");
-            } finally {
-                zipMainBtn.innerText = originalText;
-                enableDownloadOptions();
-            }
-        });
-    });
-
-    folderSaveBtn.addEventListener('click', async () => {
-        if (!('showDirectoryPicker' in window)) return;
-        try {
-            const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-            disableDownloadOptions();
-            const originalText = folderSaveBtn.innerText;
-            folderSaveBtn.innerText = "⏳ 正在写入...";
-
-            for (const item of fileQueue) {
-                if (item.status === 'done' && item.blob) {
-                    const fileHandleWav = await dirHandle.getFileHandle(`Reverb_${item.name}.wav`, { create: true });
-                    const writableWav = await fileHandleWav.createWritable();
-                    await writableWav.write(item.blob);
-                    await writableWav.close();
-
-                    const fileHandleMp3 = await dirHandle.getFileHandle(`Reverb_${item.name}.mp3`, { create: true });
-                    const writableMp3 = await fileHandleMp3.createWritable();
-                    await writableMp3.write(item.blob);
-                    await writableMp3.close();
-
-                    const fileHandleMp4 = await dirHandle.getFileHandle(`Reverb_${item.name}.mp4`, { create: true });
-                    const writableMp4 = await fileHandleMp4.createWritable();
-                    await writableMp4.write(item.blob);
-                    await writableMp4.close();
-                }
-            }
-            alert(`🎉 输出完成！每份音频已同时保存为 .wav, .mp3, .mp4 格式到您的文件夹。`);
-            folderSaveBtn.innerText = originalText;
-            enableDownloadOptions();
-        } catch (error) {
-            if (error.name !== 'AbortError') alert("保存失败，请检查权限！");
-            enableDownloadOptions();
-        }
-    });
-
-    function bufferToWave(abuffer, len) {
-        let numOfChan = abuffer.numberOfChannels, length = len * numOfChan * 2 + 44;
-        let buffer = new ArrayBuffer(length), view = new DataView(buffer), channels = [], i, sample, offset = 0, pos = 0;
-        const setUint16 = (data) => { view.setUint16(offset, data, true); offset += 2; };
-        const setUint32 = (data) => { view.setUint32(offset, data, true); offset += 4; };
-        setUint32(0x46464952); setUint32(length - 8); setUint32(0x45564157); setUint32(0x20746d66);
-        setUint32(16); setUint16(1); setUint16(numOfChan); setUint32(abuffer.sampleRate);
-        setUint32(abuffer.sampleRate * 2 * numOfChan); setUint16(numOfChan * 2); setUint16(16);
-        setUint32(0x61746164); setUint32(length - pos - 4);
-        for (i = 0; i < numOfChan; i++) channels.push(abuffer.getChannelData(i));
-        while (pos < len) {
-            for (i = 0; i < numOfChan; i++) {
-                sample = Math.max(-1, Math.min(1, channels[i][pos]));
-                sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
-                view.setInt16(offset, sample, true);
-                offset += 2;
-            }
-            pos++;
-        }
-        return new Blob([buffer], { type: "audio/wav" });
-    }
+const STORAGE_KEY="audio3d_pages_preset_v3";
+const defaultSettings={effectPreset:"cathedral",pitch:0,speed:1,motion:0,pan:0,preDelay:40,room:.4,lowCut:300,highCut:10000,wet:.1};
+const effectPresets={
+clean:{ui:{preDelay:0,room:.1,lowCut:20,highCut:20000,wet:0,motion:0},characterLowCut:20,characterHighCut:20000,distortion:0,distortionWet:0,bitDepth:16,bitWet:0,chorusWet:0,chorusFrequency:1.2,chorusDepth:.15,tremoloWet:0,tremoloFrequency:6,tremoloDepth:0,delayWet:0,delayTime:.16,delayFeedback:.15},
+cathedral:{ui:{preDelay:42,room:.72,lowCut:240,highCut:12000,wet:.18,motion:.08},characterLowCut:20,characterHighCut:20000,distortion:0,distortionWet:0,bitDepth:16,bitWet:0,chorusWet:.08,chorusFrequency:.7,chorusDepth:.22,tremoloWet:0,tremoloFrequency:4,tremoloDepth:0,delayWet:.05,delayTime:.23,delayFeedback:.18},
+phone:{ui:{preDelay:8,room:.2,lowCut:320,highCut:4200,wet:.04,motion:0},characterLowCut:320,characterHighCut:3400,distortion:.24,distortionWet:.35,bitDepth:12,bitWet:.12,chorusWet:0,chorusFrequency:1.2,chorusDepth:.15,tremoloWet:0,tremoloFrequency:7,tremoloDepth:0,delayWet:0,delayTime:.12,delayFeedback:.08},
+electro:{ui:{preDelay:24,room:.48,lowCut:140,highCut:15500,wet:.16,motion:.45},characterLowCut:90,characterHighCut:17000,distortion:.18,distortionWet:.2,bitDepth:14,bitWet:.08,chorusWet:.42,chorusFrequency:2.6,chorusDepth:.55,tremoloWet:.1,tremoloFrequency:5.5,tremoloDepth:.35,delayWet:.18,delayTime:.18,delayFeedback:.32},
+robot:{ui:{preDelay:12,room:.32,lowCut:180,highCut:9000,wet:.08,motion:.2},characterLowCut:120,characterHighCut:8500,distortion:.3,distortionWet:.18,bitDepth:6,bitWet:.58,chorusWet:.08,chorusFrequency:1.8,chorusDepth:.35,tremoloWet:.62,tremoloFrequency:13,tremoloDepth:.82,delayWet:.06,delayTime:.1,delayFeedback:.18},
+lofi:{ui:{preDelay:18,room:.28,lowCut:120,highCut:6500,wet:.1,motion:.04},characterLowCut:80,characterHighCut:6200,distortion:.16,distortionWet:.24,bitDepth:8,bitWet:.42,chorusWet:.16,chorusFrequency:.9,chorusDepth:.38,tremoloWet:.07,tremoloFrequency:3.2,tremoloDepth:.28,delayWet:.08,delayTime:.22,delayFeedback:.2}
+};
+const audioExtensions=/\.(wav|mp3|m4a|aac|ogg|flac|opus)$/i,videoExtensions=/\.(mp4|m4v|mov|webm)$/i;
+const queueBody=document.getElementById("queueBody"),queueContainer=document.getElementById("queueContainer"),playBtn=document.getElementById("playBtn"),batchExportBtn=document.getElementById("batchExportBtn"),zipDropdownWrapper=document.getElementById("zipDropdownWrapper"),zipMainBtn=document.getElementById("zipMainBtn"),zipMenuOptions=document.querySelectorAll("#zipMenu a"),folderSaveBtn=document.getElementById("folderSaveBtn"),effectPresetSelect=document.getElementById("effectPreset"),controlIds=["pitch","speed","motion","pan","preDelay","room","lowCut","highCut","wet"];
+let settings=loadSettings(),player=null,isPlaying=false,isRendering=false,fileQueue=[];
+if(!("showDirectoryPicker" in window))folderSaveBtn.title="浏览器不支持直接写入文件夹";
+const liveGraph=createProcessingGraph(settings);initUI();updateLiveGraph();
+document.getElementById("folderUpload").addEventListener("change",e=>handleFiles(e.target.files));
+document.getElementById("fileUpload").addEventListener("change",e=>handleFiles(e.target.files));
+effectPresetSelect.addEventListener("change",()=>{settings.effectPreset=effectPresetSelect.value;applyPresetDefaultsToUI(settings.effectPreset);updateLiveGraph();saveSettings();markOutputsStale()});
+controlIds.forEach(id=>{document.getElementById(id).addEventListener("input",()=>{refreshValueDisplay(id);updateLiveGraph();saveSettings();markOutputsStale()})});
+playBtn.addEventListener("click",async()=>{if(!player)return;await Tone.start();if(isPlaying){player.stop();playBtn.innerText="试听首个";isPlaying=false;return}player.stop();player.start();playBtn.innerText="暂停";isPlaying=true});
+batchExportBtn.addEventListener("click",async()=>{if(fileQueue.length===0||isRendering)return;isRendering=true;batchExportBtn.disabled=true;batchExportBtn.innerText="正在渲染...";playBtn.disabled=true;disableDownloadOptions();const decodeCtx=new(window.AudioContext||window.webkitAudioContext)(),currentSettings=collectSettings();for(let i=0;i<fileQueue.length;i++){const item=fileQueue[i];revokeItemOutputs(item);item.outputs={};item.status="processing";item.error="";updateQueueItemUI(i);try{const audioBuffer=await decodeFileToAudioBuffer(item.file,decodeCtx),renderSeconds=getRenderDuration(audioBuffer,currentSettings),renderedBuffer=await Tone.Offline(()=>{const offPlayer=new Tone.Player(audioBuffer),graph=createProcessingGraph(currentSettings);offPlayer.playbackRate=currentSettings.speed;offPlayer.connect(graph.input);offPlayer.start(0)},renderSeconds),finalBuffer=renderedBuffer.get(),wavBlob=bufferToWave(finalBuffer,finalBuffer.length);item.outputs.wav={blob:wavBlob,url:URL.createObjectURL(wavBlob)};if(window.lamejs){const mp3Blob=audioBufferToMp3(finalBuffer,192);item.outputs.mp3={blob:mp3Blob,url:URL.createObjectURL(mp3Blob)}}item.status="done"}catch(error){console.error(`文件 ${item.name} 处理失败:`,error);item.status="error";item.error=getFriendlyError(item.file,error)}updateQueueItemUI(i)}if(decodeCtx.close)decodeCtx.close();isRendering=false;batchExportBtn.innerText="批量处理完成";playBtn.disabled=!player;if(fileQueue.some(item=>item.status==="done"))enableDownloadOptions();setTimeout(()=>{batchExportBtn.innerText="再次批量渲染";batchExportBtn.disabled=fileQueue.length===0},1600)});
+zipMenuOptions.forEach(option=>{option.addEventListener("click",async event=>{event.preventDefault();if(zipMainBtn.disabled)return;const mode=event.target.getAttribute("data-mode"),originalText=zipMainBtn.innerText;zipMainBtn.disabled=true;zipDropdownWrapper.classList.add("disabled");zipMainBtn.innerText="正在打包...";try{const zip=new JSZip();let entryCount=0;fileQueue.forEach(item=>{if(item.status!=="done")return;if((mode==="all"||mode==="wav")&&item.outputs.wav){zip.file(`Audio3D_${item.name}.wav`,item.outputs.wav.blob);entryCount++}if((mode==="all"||mode==="mp3")&&item.outputs.mp3){zip.file(`Audio3D_${item.name}.mp3`,item.outputs.mp3.blob);entryCount++}});if(entryCount===0)return;const content=await zip.generateAsync({type:"blob"}),url=URL.createObjectURL(content),anchor=document.createElement("a"),typeName=mode==="all"?"WAV_MP3":mode.toUpperCase();anchor.download=`Audio3D_${typeName}_Batch_${entryCount}files.zip`;anchor.href=url;anchor.click();URL.revokeObjectURL(url)}catch(error){alert("打包出错，请重新渲染后再试。")}finally{zipMainBtn.innerText=originalText;enableDownloadOptions()}})});
+folderSaveBtn.addEventListener("click",async()=>{if(!("showDirectoryPicker" in window))return;try{const dirHandle=await window.showDirectoryPicker({mode:"readwrite"}),originalText=folderSaveBtn.innerText;disableDownloadOptions();folderSaveBtn.innerText="正在写入...";for(const item of fileQueue){if(item.status!=="done")continue;if(item.outputs.wav)await writeBlobToDirectory(dirHandle,`Audio3D_${item.name}.wav`,item.outputs.wav.blob);if(item.outputs.mp3)await writeBlobToDirectory(dirHandle,`Audio3D_${item.name}.mp3`,item.outputs.mp3.blob)}alert("输出完成，已保存为真实 WAV / MP3 文件。");folderSaveBtn.innerText=originalText;enableDownloadOptions()}catch(error){if(error.name!=="AbortError")alert("保存失败，请检查浏览器权限。");enableDownloadOptions()}});
+async function handleFiles(files){const supportedFiles=Array.from(files).filter(isSupportedMediaFile);if(supportedFiles.length===0){alert("未检测到可处理的音频或 MP4 文件。");return}stopPreview();revokeQueueOutputs();fileQueue=supportedFiles.map(file=>({file,name:safeFileBaseName(file.name.replace(/\.[^/.]+$/,"") ),displayName:file.name,typeLabel:getTypeLabel(file),status:"wait",error:"",outputs:{}}));renderQueueTable();queueContainer.style.display="block";batchExportBtn.disabled=false;batchExportBtn.innerText="批量渲染";disableDownloadOptions();await preparePreview(fileQueue[0])}
+async function preparePreview(item){playBtn.disabled=true;playBtn.innerText="加载中...";const decodeCtx=new(window.AudioContext||window.webkitAudioContext)();try{const audioBuffer=await decodeFileToAudioBuffer(item.file,decodeCtx);player=new Tone.Player(audioBuffer);player.playbackRate=collectSettings().speed;player.connect(liveGraph.input);playBtn.disabled=false;playBtn.innerText="试听首个"}catch(error){console.warn("预览加载失败:",error);playBtn.disabled=true;playBtn.innerText="无法试听"}finally{if(decodeCtx.close)decodeCtx.close()}}
+async function decodeFileToAudioBuffer(file,audioContext){const arrayBuffer=await file.arrayBuffer();return audioContext.decodeAudioData(arrayBuffer.slice(0))}
+function createProcessingGraph(values){const graphValues=normalizeSettings(values),preset=effectPresets[graphValues.effectPreset]||effectPresets.cathedral,input=new Tone.PitchShift(getCompensatedPitch(graphValues.pitch,graphValues.speed)),characterLowCut=new Tone.Filter({type:"highpass",frequency:preset.characterLowCut}),characterHighCut=new Tone.Filter({type:"lowpass",frequency:preset.characterHighCut}),distortion=new Tone.Distortion(preset.distortion),bitCrusher=new Tone.BitCrusher(preset.bitDepth),chorus=new Tone.Chorus(preset.chorusFrequency,2.5,preset.chorusDepth).start(),tremolo=new Tone.Tremolo(preset.tremoloFrequency,preset.tremoloDepth).start(),delayFx=new Tone.FeedbackDelay(preset.delayTime,preset.delayFeedback),pan=new Tone.Panner(graphValues.pan),autoPanner=new Tone.AutoPanner({frequency:getMotionFrequency(graphValues.motion),depth:graphValues.motion,wet:getMotionWet(graphValues.motion)}).start(),preDelay=new Tone.Delay(graphValues.preDelay/1000),lowCut=new Tone.Filter({type:"highpass",frequency:graphValues.lowCut}),highCut=new Tone.Filter({type:"lowpass",frequency:graphValues.highCut}),reverb=new Tone.Freeverb({roomSize:graphValues.room,dampening:8000}),crossFade=new Tone.CrossFade(graphValues.wet);input.chain(characterLowCut,characterHighCut,distortion,bitCrusher,chorus,tremolo,delayFx,pan,autoPanner);autoPanner.connect(crossFade.a);autoPanner.connect(preDelay);preDelay.chain(lowCut,highCut,reverb,crossFade.b);crossFade.toDestination();const graph={input,pitchShift:input,characterLowCut,characterHighCut,distortion,bitCrusher,chorus,tremolo,delayFx,pan,autoPanner,preDelay,lowCut,highCut,reverb,crossFade};applyGraphSettings(graph,graphValues);return graph}
+function applyGraphSettings(graph,values){const graphValues=normalizeSettings(values),preset=effectPresets[graphValues.effectPreset]||effectPresets.cathedral;graph.pitchShift.pitch=getCompensatedPitch(graphValues.pitch,graphValues.speed);graph.characterLowCut.frequency.value=preset.characterLowCut;graph.characterHighCut.frequency.value=preset.characterHighCut;graph.distortion.distortion=preset.distortion;graph.distortion.wet.value=preset.distortionWet;graph.bitCrusher.wet.value=preset.bitWet;setBitCrusherBits(graph.bitCrusher,preset.bitDepth);graph.chorus.frequency.value=preset.chorusFrequency;graph.chorus.depth=preset.chorusDepth;graph.chorus.wet.value=preset.chorusWet;graph.tremolo.frequency.value=preset.tremoloFrequency;graph.tremolo.depth.value=preset.tremoloDepth;graph.tremolo.wet.value=preset.tremoloWet;graph.delayFx.delayTime.value=preset.delayTime;graph.delayFx.feedback.value=preset.delayFeedback;graph.delayFx.wet.value=preset.delayWet;graph.pan.pan.value=graphValues.pan;graph.autoPanner.frequency.value=getMotionFrequency(graphValues.motion);graph.autoPanner.depth.value=graphValues.motion;graph.autoPanner.wet.value=getMotionWet(graphValues.motion);graph.preDelay.delayTime.value=graphValues.preDelay/1000;graph.lowCut.frequency.value=graphValues.lowCut;graph.highCut.frequency.value=graphValues.highCut;graph.reverb.roomSize.value=graphValues.room;graph.crossFade.fade.value=graphValues.wet}
+function updateLiveGraph(){const current=collectSettings();applyGraphSettings(liveGraph,current);if(player)player.playbackRate=current.speed}
+function getCompensatedPitch(pitchSemitones,speed){return pitchSemitones-12*Math.log2(speed||1)}
+function getMotionFrequency(motion){return .06+motion*.74}
+function getMotionWet(motion){return Math.min(.85,Math.max(0,motion))}
+function setBitCrusherBits(node,bits){try{if(node.bits&&typeof node.bits.value==="number")node.bits.value=bits;else node.bits=bits}catch(error){console.warn("Bit depth update failed:",error)}}
+function getRenderDuration(audioBuffer,values){const speed=Math.max(.1,values.speed||1);return audioBuffer.duration/speed+4}
+function renderQueueTable(){queueBody.innerHTML=fileQueue.map((item,index)=>`<tr><td class="file-name" title="${escapeHtml(item.displayName)}">${escapeHtml(item.displayName)}</td><td class="file-type">${escapeHtml(item.typeLabel)}</td><td id="status-${index}" class="status-${item.status}">${getStatusText(item)}</td><td id="action-${index}">-</td></tr>`).join("")}
+function updateQueueItemUI(index){const item=fileQueue[index],statusTd=document.getElementById(`status-${index}`),actionTd=document.getElementById(`action-${index}`);if(!statusTd||!actionTd)return;statusTd.className=`status-${item.status}`;statusTd.innerText=getStatusText(item);if(item.status==="done"){const wavButton=item.outputs.wav?`<a href="${item.outputs.wav.url}" download="Audio3D_${escapeHtml(item.name)}.wav" class="btn-download">WAV</a>`:"",mp3Button=item.outputs.mp3?`<a href="${item.outputs.mp3.url}" download="Audio3D_${escapeHtml(item.name)}.mp3" class="btn-download btn-download-mp3">MP3</a>`:"";actionTd.innerHTML=`<div class="action-cell">${wavButton}${mp3Button}</div>`;return}actionTd.innerHTML="-"}
+function getStatusText(item){switch(item.status){case"wait":return"等待处理";case"processing":return"处理中...";case"done":return item.outputs.mp3?"完成":"完成 WAV";case"error":return item.error||"失败";default:return""}}
+function enableDownloadOptions(){zipMainBtn.disabled=false;zipDropdownWrapper.classList.remove("disabled");if("showDirectoryPicker" in window)folderSaveBtn.disabled=false}
+function disableDownloadOptions(){zipMainBtn.disabled=true;zipDropdownWrapper.classList.add("disabled");folderSaveBtn.disabled=true}
+function stopPreview(){if(player){player.stop();player.dispose();player=null}isPlaying=false;playBtn.innerText="试听首个";playBtn.disabled=true}
+function markOutputsStale(){if(isRendering||fileQueue.length===0)return;let changed=false;fileQueue.forEach(item=>{if(item.status==="done"||Object.keys(item.outputs).length>0){revokeItemOutputs(item);item.outputs={};item.status="wait";item.error="";changed=true}});if(changed){fileQueue.forEach((_,index)=>updateQueueItemUI(index));batchExportBtn.disabled=false;batchExportBtn.innerText="批量渲染";disableDownloadOptions()}}
+function revokeQueueOutputs(){fileQueue.forEach(revokeItemOutputs)}
+function revokeItemOutputs(item){Object.values(item.outputs||{}).forEach(output=>{if(output&&output.url)URL.revokeObjectURL(output.url)})}
+function initUI(){effectPresetSelect.value=settings.effectPreset;controlIds.forEach(id=>{document.getElementById(id).value=settings[id];refreshValueDisplay(id)})}
+function applyPresetDefaultsToUI(presetName){const preset=effectPresets[presetName]||effectPresets.cathedral;Object.entries(preset.ui||{}).forEach(([id,value])=>{const element=document.getElementById(id);if(!element)return;element.value=value;refreshValueDisplay(id)})}
+function refreshValueDisplay(id){const value=parseFloat(document.getElementById(id).value),display=document.getElementById(`${id}-val`);if(!display)return;if(id==="pitch")display.innerText=`${value>0?"+":""}${value.toFixed(0)}`;else if(id==="speed")display.innerText=value.toFixed(2);else if(id==="motion")display.innerText=Math.round(value*100);else if(id==="pan"||id==="room"||id==="wet")display.innerText=value.toFixed(2);else display.innerText=value.toFixed(0)}
+function collectSettings(){const current={effectPreset:effectPresetSelect.value};controlIds.forEach(id=>{current[id]=parseFloat(document.getElementById(id).value)});settings=normalizeSettings(current);return settings}
+function normalizeSettings(raw){return{...defaultSettings,...raw,effectPreset:effectPresets[raw.effectPreset]?raw.effectPreset:defaultSettings.effectPreset,pitch:clampNumber(raw.pitch,-12,12,defaultSettings.pitch),speed:clampNumber(raw.speed,.5,1.8,defaultSettings.speed),motion:clampNumber(raw.motion,0,1,defaultSettings.motion),pan:clampNumber(raw.pan,-1,1,defaultSettings.pan),preDelay:clampNumber(raw.preDelay,0,200,defaultSettings.preDelay),room:clampNumber(raw.room,0,.99,defaultSettings.room),lowCut:clampNumber(raw.lowCut,20,1000,defaultSettings.lowCut),highCut:clampNumber(raw.highCut,5000,20000,defaultSettings.highCut),wet:clampNumber(raw.wet,0,1,defaultSettings.wet)}}
+function clampNumber(value,min,max,fallback){const numeric=Number(value);if(!Number.isFinite(numeric))return fallback;return Math.min(max,Math.max(min,numeric))}
+function loadSettings(){const saved=localStorage.getItem(STORAGE_KEY);if(!saved)return{...defaultSettings};try{return normalizeSettings({...defaultSettings,...JSON.parse(saved)})}catch(error){return{...defaultSettings}}}
+function saveSettings(){localStorage.setItem(STORAGE_KEY,JSON.stringify(collectSettings()))}
+function isSupportedMediaFile(file){const type=file.type||"";return type.startsWith("audio/")||type.startsWith("video/")||audioExtensions.test(file.name)||videoExtensions.test(file.name)}
+function getTypeLabel(file){const type=file.type||"";if(type.startsWith("video/")||videoExtensions.test(file.name))return"视频音轨";return"音频"}
+function getFriendlyError(file){if(getTypeLabel(file)==="视频音轨")return"浏览器未解析音轨";return"解码失败"}
+async function writeBlobToDirectory(dirHandle,fileName,blob){const fileHandle=await dirHandle.getFileHandle(fileName,{create:true}),writable=await fileHandle.createWritable();await writable.write(blob);await writable.close()}
+function audioBufferToMp3(abuffer,kbps){const channels=Math.min(2,abuffer.numberOfChannels),sampleRate=abuffer.sampleRate,encoder=new lamejs.Mp3Encoder(channels,sampleRate,kbps),mp3Data=[],sampleBlockSize=1152;for(let offset=0;offset<abuffer.length;offset+=sampleBlockSize){const end=Math.min(offset+sampleBlockSize,abuffer.length),left=floatTo16BitPCM(abuffer.getChannelData(0),offset,end);let mp3Buffer;if(channels===2){const right=floatTo16BitPCM(abuffer.getChannelData(1),offset,end);mp3Buffer=encoder.encodeBuffer(left,right)}else mp3Buffer=encoder.encodeBuffer(left);if(mp3Buffer.length>0)mp3Data.push(mp3Buffer)}const flush=encoder.flush();if(flush.length>0)mp3Data.push(flush);return new Blob(mp3Data,{type:"audio/mpeg"})}
+function floatTo16BitPCM(channelData,start,end){const result=new Int16Array(end-start);for(let i=start;i<end;i++){const sample=Math.max(-1,Math.min(1,channelData[i]));result[i-start]=sample<0?sample*32768:sample*32767}return result}
+function bufferToWave(abuffer,len){const numOfChan=abuffer.numberOfChannels,bytesPerSample=2,dataLength=len*numOfChan*bytesPerSample,buffer=new ArrayBuffer(44+dataLength),view=new DataView(buffer),channels=[];let offset=0;const setUint16=data=>{view.setUint16(offset,data,true);offset+=2},setUint32=data=>{view.setUint32(offset,data,true);offset+=4};setUint32(0x46464952);setUint32(36+dataLength);setUint32(0x45564157);setUint32(0x20746d66);setUint32(16);setUint16(1);setUint16(numOfChan);setUint32(abuffer.sampleRate);setUint32(abuffer.sampleRate*numOfChan*bytesPerSample);setUint16(numOfChan*bytesPerSample);setUint16(16);setUint32(0x61746164);setUint32(dataLength);for(let i=0;i<numOfChan;i++)channels.push(abuffer.getChannelData(i));for(let pos=0;pos<len;pos++){for(let i=0;i<numOfChan;i++){const sample=Math.max(-1,Math.min(1,channels[i][pos]));view.setInt16(offset,sample<0?sample*32768:sample*32767,true);offset+=2}}return new Blob([buffer],{type:"audio/wav"})}
+function safeFileBaseName(name){const cleaned=name.replace(/[\\/:*?"<>|]+/g,"_").trim();return(cleaned||"audio").slice(0,120)}
+function escapeHtml(value){return String(value).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;")}
 </script>
 </body>
 </html>
